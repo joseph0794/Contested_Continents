@@ -1,0 +1,2564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contested Continents — An Experimental Strategy Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Barlow+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1e19;
+    --panel: #23271f;
+    --panel-2: #2a2f25;
+    --panel-3: #30362a;
+    --ink: #e9e3d3;
+    --muted: #a79f8c;
+    --accent: #c99a3c;
+    --accent-2: #8a6d2f;
+    --border: #3a3f30;
+    --human: #2c8c7c;
+    --ai1: #a6342b;
+    --ai2: #3e4c82;
+    --ai3: #3f6b3a;
+    --ai4: #6e3b63;
+    --neutral: #827a6a;
+    --good: #6ebeaa;
+    --bad: #c15c48;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: 'Barlow Condensed', sans-serif; -webkit-tap-highlight-color: transparent; }
+  body {
+    background-image:
+      radial-gradient(ellipse at top, rgba(201,154,60,0.06), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0 2px, transparent 2px 4px);
+  }
+  h1, h2, h3, h4 { font-family: 'Cinzel', serif; font-weight: 700; margin: 0; letter-spacing: 0.02em; }
+  .muted { color: var(--muted); }
+  button {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: var(--panel-3);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 9px 12px;
+    min-height: 40px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent); }
+  button.active { background: var(--accent); color: #1b1e19; border-color: var(--accent); }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  input[type=text] {
+    font-family: 'Barlow Condensed', sans-serif;
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 3px; padding: 9px 12px; font-size: 16px; width: 100%;
+  }
+
+  /* ---- Layout ---- */
+  .app { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  #errorBanner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: #a6342b; color: #fff; padding: 10px 16px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; text-align: center; word-break: break-word; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  }
+  header.topbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px 18px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 14px;
+  }
+  .title-block { display: flex; align-items: baseline; gap: 10px; }
+  .title-block h1 { font-size: 22px; color: var(--accent); }
+  .title-block .subtitle { font-size: 13px; color: var(--muted); font-style: italic; }
+  .god-badge {
+    display: inline-flex; align-items: center; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em; color: #1b1e19; background: var(--accent);
+    padding: 3px 8px; border-radius: 3px; font-weight: 700;
+  }
+  .god-toggle {
+    display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 14px;
+    color: var(--muted); cursor: pointer;
+  }
+  .god-toggle input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .stats { display: flex; gap: 18px; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+  .stats .stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; }
+  .stats .stat span.label { font-family: 'Barlow Condensed', sans-serif; font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.06em; }
+  .stats .stat span.value { font-size: 17px; color: var(--accent); font-weight: 600; }
+  .stats .stat span.value .value-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #endTurnBtn { font-size: 16px; font-weight: 700; padding: 10px 22px; min-width: 180px; letter-spacing: 0.04em; }
+
+  .main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .map-column { flex: 1 1 640px; min-width: 320px; }
+  #mapWrap {
+    position: relative; border: 6px solid var(--panel-3); border-radius: 4px;
+    box-shadow: 0 0 0 1px var(--border), inset 0 0 60px rgba(0,0,0,0.45), 0 12px 34px rgba(0,0,0,0.4);
+    background: var(--seaDeep, #0e161c); overflow: hidden;
+  }
+  #mapWrap::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 90px rgba(0,0,0,0.55); z-index: 2;
+  }
+  #mapScroll { width: 100%; height: 100%; overflow: auto; }
+  #mapCanvas { display: block; cursor: pointer; touch-action: manipulation; }
+  .zoom-controls {
+    position: absolute; right: 10px; bottom: 10px; z-index: 3;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .zoom-controls button {
+    width: 42px; height: 42px; min-height: 42px; padding: 0; font-size: 20px; line-height: 1;
+    background: rgba(35,39,31,0.88); backdrop-filter: blur(2px);
+  }
+
+  #hintBar {
+    margin-top: 10px; padding: 9px 14px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; font-size: 15px; color: var(--ink); min-height: 18px;
+  }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.4); }
+  .swatch.human { background: var(--human); } .swatch.ai1 { background: var(--ai1); }
+  .swatch.ai2 { background: var(--ai2); } .swatch.ai3 { background: var(--ai3); }
+  .swatch.ai4 { background: var(--ai4); } .swatch.neutral { background: var(--neutral); }
+
+  /* ---- Sidebar ---- */
+  .sidebar { flex: 0 0 340px; min-width: 300px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .tab-btn { flex: 1; background: transparent; border: 1px solid var(--border); font-size: 12px; padding: 7px 4px; }
+  .tab-btn.active { background: var(--accent); color: #1b1e19; border-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+  .stat-row span { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .stat-row b { color: var(--ink); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .stale { color: var(--muted); font-size: 11px; font-style: italic; }
+
+  .nation-row { padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .nation-name { display: flex; align-items: center; gap: 7px; font-weight: 600; margin-bottom: 5px; }
+  .relation-bar { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
+  .relation-fill { height: 100%; background: linear-gradient(90deg, var(--bad), var(--accent), var(--good)); }
+  .nation-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .nation-actions button { font-size: 11px; padding: 5px 8px; }
+  .pact-tag { font-size: 11px; color: var(--good); text-transform: uppercase; letter-spacing: 0.04em; }
+  .prop-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; gap: 8px; }
+  .prop-btns { display: flex; gap: 6px; }
+  .prop-btns button { font-size: 11px; padding: 5px 8px; }
+
+  .tech-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .tech-info { flex: 1; display: flex; flex-direction: column; }
+  .tech-info span.muted { font-size: 11px; }
+  .tech-dots { display: flex; gap: 3px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border); }
+  .dot.filled { background: var(--accent); border-color: var(--accent); }
+  .maxed { font-size: 11px; color: var(--good); }
+  .tech-row button { font-size: 11px; padding: 6px 9px; white-space: nowrap; }
+
+  .log-row { font-size: 13px; padding: 5px 0; border-bottom: 1px dashed var(--border); line-height: 1.4; }
+  .log-round { font-family: 'JetBrains Mono', monospace; color: var(--accent); margin-right: 6px; font-size: 11px; }
+
+  /* ---- Modals ---- */
+  .modal { display: none; position: fixed; inset: 0; background: rgba(10,11,9,0.82); z-index: 50; align-items: center; justify-content: center; padding: 20px; }
+  .modal.open { display: flex; }
+  .modal-box {
+    background: var(--panel); border: 1px solid var(--accent-2); border-radius: 8px; padding: 28px;
+    max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    max-height: 88vh; max-height: 88dvh; overflow-y: auto;
+  }
+  .modal-box h2 { font-size: 24px; color: var(--accent); margin-bottom: 14px; }
+  .modal-box p { line-height: 1.5; color: var(--muted); margin: 10px 0; }
+  .modal-box .actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  #gameOverTitle.win { color: var(--good); }
+  #gameOverTitle.lose { color: var(--bad); }
+  .help-list { font-size: 14px; line-height: 1.6; }
+  .help-list b { color: var(--accent); }
+
+  footer.credit { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; }
+
+  @media (max-width: 860px) {
+    .sidebar { flex: 1 1 100%; }
+    .stats { gap: 10px; }
+    .stats .stat { min-width: 42px; }
+  }
+
+  @media (max-width: 520px) {
+    .app { padding: 8px; }
+    header.topbar { padding: 10px 12px; gap: 8px; }
+    .title-block { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .title-block h1 { font-size: 18px; }
+    .title-block .subtitle { font-size: 11px; }
+    .stats { gap: 8px; width: 100%; justify-content: space-between; }
+    .stats .stat { min-width: 0; flex: 1 1 0; }
+    .stats .stat span.label { font-size: 9px; }
+    .stats .stat span.value { font-size: 15px; }
+    .toolbar { width: 100%; gap: 6px; }
+    .toolbar button { flex: 1 1 auto; font-size: 12px; padding: 9px 8px; }
+    .sidebar { padding: 10px; min-width: 0; }
+    .tab-btn { font-size: 11px; padding: 8px 3px; }
+    .modal-box { padding: 18px; max-width: 94vw; max-height: 88vh; overflow-y: auto; }
+    .modal-box h2 { font-size: 20px; }
+    #hintBar { font-size: 13px; padding: 8px 10px; }
+    .legend { font-size: 11px; gap: 8px; }
+    .zoom-controls button { width: 46px; height: 46px; min-height: 46px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="errorBanner"></div>
+  <header class="topbar">
+    <div class="title-block">
+      <h1>Contested Continents</h1>
+      <span class="subtitle">an experimental strategy game, built with Claude</span>
+      <span id="godModeBadge" class="god-badge" style="display:none;">GOD MODE</span>
+      <span id="hardModeBadge" class="god-badge" style="display:none; background:var(--bad);">HARD MODE</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="label">Round</span><span class="value" id="turnCounter">1</span></div>
+      <div class="stat"><span class="label">Gold</span><span class="value" id="goldCounter">0</span></div>
+      <div class="stat"><span class="label">Reinf.</span><span class="value" id="reinforceCounter">0</span></div>
+      <div class="stat"><span class="label">Territories</span><span class="value" id="territoryCounter">0</span></div>
+      <div class="stat"><span class="label">Army</span><span class="value" id="armyCounter">0<span class="value-sub">/0</span></span></div>
+    </div>
+    <div class="toolbar">
+      <button id="reinforceModeBtn">Reinforce [R]</button>
+      <button id="buyarmyModeBtn">Buy Army</button>
+      <button id="fortifyModeBtn">Move</button>
+      <button id="attackModeBtn">Attack [A]</button>
+      <button id="autoReinforceBtn" class="ghost">Auto-place</button>
+      <button id="terrainViewBtn" class="ghost">Terrain View [T]</button>
+      <button id="autoPlayBtn" class="ghost">Auto-Play [P]</button>
+      <button id="endTurnBtn" style="background:var(--accent);color:#1b1e19;border-color:var(--accent);">End Turn</button>
+      <button id="helpBtn" class="ghost">?</button>
+      <button id="restartBtn" class="ghost">New</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="map-column">
+      <div id="mapWrap">
+        <div id="mapScroll">
+          <canvas id="mapCanvas" width="900" height="900"></canvas>
+        </div>
+        <div class="zoom-controls">
+          <button id="zoomInBtn" title="Zoom in">+</button>
+          <button id="zoomOutBtn" title="Zoom out">&minus;</button>
+        </div>
+      </div>
+      <div id="hintBar">Select a territory to inspect it.</div>
+      <div class="legend" id="legendContainer"></div>
+    </div>
+
+    <div class="sidebar">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="territory">Territory</button>
+        <button class="tab-btn" data-tab="tech">Tech</button>
+        <button class="tab-btn" data-tab="log">Log</button>
+      </div>
+      <div class="tab-panel active" id="territoryPanel"></div>
+      <div class="tab-panel" id="techPanel"></div>
+      <div class="tab-panel" id="logPanel"></div>
+    </div>
+  </div>
+
+  <footer class="credit">Procedurally generated map · fog of war · naval invasions · terrain · tech</footer>
+</div>
+
+<!-- New Game Modal -->
+<div class="modal open" id="newGameModal">
+  <div class="modal-box">
+    <h2>Contested Continents</h2>
+    <p id="restartWarning" style="display:none; color:var(--bad);">Starting a new campaign will discard your current progress.</p>
+    <p>A procedurally generated world of ~80 territories. Lead your nation against four AI rivals and neutral garrisons, under fog of war.</p>
+    <input type="text" id="nationNameInput" placeholder="Name your nation" maxlength="28">
+    <label class="god-toggle">
+      <input type="checkbox" id="firstTimeCheckbox">
+      <span>I'm new to this game — show a quick how-to-play summary</span>
+    </label>
+    <div id="inlineInstructions" style="display:none;">
+      <p><b>Quick start:</b> Reinforce places free armies each round. Attack commits most of a territory's force, but a width cap limits how many can actually fight — small territories and Mountains especially. Move repositions armies (2 free per turn, then a small gold cost). Buy Army and Tech both cost gold. Watch your Army cap in the top bar. From round 10, you'll choose a Capital — losing it ends your game immediately, so guard it well.</p>
+    </div>
+    <label class="god-toggle">
+      <input type="checkbox" id="godModeCheckbox">
+      <span>God Mode — reveal the whole map, no fog of war (for testing)</span>
+    </label>
+    <label class="god-toggle">
+      <input type="checkbox" id="hardModeCheckbox">
+      <span>Hard Mode — AI nations get +15% reinforcement per round</span>
+    </label>
+    <div class="actions">
+      <button id="beginBtn" style="background:var(--accent);color:#1b1e19;border-color:var(--accent);">Begin Campaign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over Modal -->
+<div class="modal" id="gameOverModal">
+  <div class="modal-box">
+    <h2 id="gameOverTitle">Victory</h2>
+    <p id="gameOverReason"></p>
+    <div id="gameOverTable"></div>
+    <div class="actions">
+      <button id="playAgainBtn" style="background:var(--accent);color:#1b1e19;border-color:var(--accent);">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal" id="helpModal">
+  <div class="modal-box">
+    <h2>How to play</h2>
+    <div class="help-list">
+      <p><b>Reinforce</b> — place new armies on your territories from your automatic reinforcement pool (free). Pool size grows with territory count, continent bonuses, and Logistics tech, but is capped — see Army cap below.</p>
+      <p><b>Attack</b> — select a territory: up to all but 1 army commits to the fight, capped by a width limit (whichever is smaller: your territory's own size, or the target's terrain — Mountains cap at 5, Forest/Ice at 8, Plains/Desert at 12). Simplified formula:</p>
+      <p style="font-family:'JetBrains Mono',monospace; font-size:12px; background:rgba(0,0,0,0.25); padding:8px 10px; border-radius:4px;">Power = Armies × Random(0.85–1.15) × Tech/Terrain bonus<br>Win chance = Attacker Power ÷ (Attacker Power + Defender Power)</p>
+      <p>Higher power usually wins, but it's a probability, not a guarantee. Win and most of your force advances into the conquered territory; lose and most of it is lost, with survivors retreating home.</p>
+      <p><b>Move</b> — relocate armies between two territories you own that are connected by a land border or a naval lane (anywhere you could attack, minus the rare open-sea reach, which stays attack-only). The first few moves each turn are free (2 by default, more with Movement tech); after that it's 5g per move (also reduced by Movement tech, minimum 1g). The amount moved is fixed, not chosen: 1 army always stays behind to hold the source, and roughly 60% of the rest goes with the move (rounded, minimum 1) — the exact number is shown before you confirm. No longer limited by a hard turn cap — move as often as your free moves and gold allow.</p>
+      <p><b>Buy Army</b> — spend 10g to add 1 army to your reinforcement pool (respecting your army cap), ready to place wherever you like via Reinforce.</p>
+      <p><b>Terrain</b> — every territory is Plains, Forest, Desert, Mountains, or Ice. Forest and Mountains give the defender a strength bonus (shown as a letter badge on the map: F, M, D, or I — Plains carries none). Use the Terrain View button to color the whole map by terrain instead of ownership.</p>
+      <p><b>Army cap</b> — your total army count is capped, shown as Army in the top bar. Each territory you hold raises the cap by an amount that depends on its terrain — Plains raises it the most, Forest and Desert a moderate amount, Mountains and Ice the least. Once you're at the cap, further reinforcements and army purchases stop until you gain more territory (or lose armies).</p>
+      <p><b>Tech</b> — advance Fortifications, Siege Engineering, Naval Doctrine, Logistics, or Movement one level at a time: 50g for the 1st level, 100g for the 2nd, 150g for the 3rd (max level 3 each). Movement makes moving cheaper AND more generous: each level adds 2 more free moves per turn (2 -&gt; 4 -&gt; 6 -&gt; 8) and cuts the paid cost by 1g per level.</p>
+      <p><b>Gold</b> — income is deliberately small (a fraction of your territory count each round), so spending it on armies, tech, or moves is a real trade-off, not something to do every turn without thinking.</p>
+      <p><b>Capital</b> — at round 10, every surviving nation designates one territory as its capital (AI picks automatically; you choose by clicking one of your own territories when prompted — pick somewhere defensible). It grants +3g and +1 reinforcement every round. But if it's ever captured, that nation is eliminated instantly — every other territory it held is annexed by the conqueror on the spot (each keeping half its garrison, minimum 1), no matter how much land it still controlled. Your capital is marked with a ★ on the map.</p>
+      <p><b>Fog of war</b> — you only see live information for your own territories and their neighbors. Everything else shows either "unknown" or a stale last-known snapshot. God Mode (toggle at campaign start) disables this entirely, for testing.</p>
+      <p><b>Hard Mode</b> — toggle at campaign start. Every AI nation gets +15% reinforcement per round on top of the normal amount, for a tougher game.</p>
+      <p><b>Auto-Play</b> — hands your turns to an autopilot (reinforce, attack favorable targets, spend gold, end turn) so you can watch a full game play out. Available anytime, not just in God Mode.</p>
+      <p><b>Keyboard shortcuts</b> — R Reinforce, B Buy Army, M Move, A Attack, T Terrain View, P Auto-Play, E End Turn. Disabled while typing in a text field or while a modal is open.</p>
+    </div>
+    <div class="actions">
+      <button data-close-modal>Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CORE GAME LOGIC — no DOM references, testable in plain Node.
+// This file is later inlined into the single-file HTML build.
+// ============================================================
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function dist2(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function choice(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
+function shuffle(rng, arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ---------------- Name generation ----------------
+const SYL_A = ['Vas', 'Kor', 'Thal', 'Bren', 'Os', 'Dur', 'Mir', 'Sel', 'Gal', 'Var', 'Nol', 'Cas', 'Ith', 'Fen', 'Wyr', 'Hal', 'Bal', 'Tor', 'Aer', 'Ust'];
+const SYL_B = ['a', 'e', 'i', 'o', 'u', 'ae', 'en', 'ar', 'or'];
+const SYL_C = ['ren', 'mere', 'gard', 'holm', 'ton', 'wick', 'dale', 'burn', 'shire', 'moor', 'reach', 'fell', 'grave', 'wyn', 'stead', 'crest', 'vale', 'haven', 'rock', 'ford'];
+function genName(rng) {
+  const a = choice(rng, SYL_A);
+  const c = choice(rng, SYL_C);
+  return rng() < 0.35 ? a + choice(rng, SYL_B) + c : a + c;
+}
+function genContinentName(rng) {
+  const prefixes = ['The', ''];
+  const base = genName(rng);
+  const suffix = choice(rng, ['', ' Isles', ' Reach', ' Expanse', '']);
+  const p = choice(rng, prefixes);
+  return (p ? p + ' ' : '') + base + suffix;
+}
+const NATION_NAMES = [
+  'Imperium Novastra', 'Dominion Ferrivox', 'Concordia Astralis', 'Legio Ultima',
+  'Pax Machina', 'Res Publica Cinis', 'Sidus Aeternum', 'Nova Praetoria',
+  'Dominion Umbraluna', 'Aurum Stellaris'
+];
+
+// Territory names honor historical scientists, across disciplines and eras.
+const SCIENTIST_NAMES = [
+  'Newton', 'Einstein', 'Curie', 'Darwin', 'Galileo', 'Tesla', 'Faraday', 'Hawking',
+  'Turing', 'Franklin', 'Pasteur', 'Mendel', 'Bohr', 'Feynman', 'Copernicus', 'Kepler',
+  'Lavoisier', 'Archimedes', 'Euclid', 'Hypatia', 'Fibonacci', 'Maxwell', 'Planck',
+  'Heisenberg', 'Schrodinger', 'Dirac', 'Fermi', 'Oppenheimer', 'Sagan', 'Hubble',
+  'Lovelace', 'Babbage', 'Mendeleev', 'Pauling', 'Watson', 'Crick', 'Goodall',
+  'Chandrasekhar', 'Ramanujan', 'Noether', 'Meitner', 'Volta', 'Ampere', 'Kelvin',
+  'Boltzmann', 'Rutherford', 'Chadwick', 'Pauli', 'Born', 'Fleming', 'Jenner',
+  'Linnaeus', 'Lyell', 'Wallace', 'Huygens', 'Pascal', 'Descartes', 'Leibniz', 'Gauss',
+  'Euler', 'Laplace', 'Lagrange', 'Hamilton', 'Cavendish', 'Boyle', 'Priestley',
+  'Dalton', 'Avogadro', 'Bernoulli', 'Brahe', 'Halley', 'Herschel', 'Doppler', 'Joule',
+  'Watt', 'Marconi', 'Roentgen', 'Becquerel', 'Hertz', 'Lorentz', 'Michelson',
+  'Compton', 'Bardeen', 'Wigner', 'Bethe', 'GellMann', 'Higgs', 'Penrose', 'Landau',
+  'Pavlov', 'Vernadsky', 'Lomonosov', 'Galvani', 'Torricelli', 'Snow', 'Semmelweis'
+];
+function pickScientistNames(rng, count) {
+  const pool = shuffle(rng, SCIENTIST_NAMES);
+  const out = [];
+  for (let i = 0; i < count; i++) out.push(pool[i % pool.length]);
+  return out;
+}
+
+// ---------------- Map generation ----------------
+// ============================================================
+// PANGEA WORLD GENERATION — one large landmass with organic
+// peninsulas/bays (real chokepoints, Italy/Korea-style necks),
+// a latitude bias (land favored near the equator, sparse at the
+// poles), and a handful of islands. Continents are then derived
+// from actual connectivity (flood fill), not from the generating
+// anchors, so the shape can be arbitrarily organic.
+// ============================================================
+function makeNoiseOctaves(rng, count, baseFreq) {
+  const octaves = [];
+  for (let i = 0; i < count; i++) {
+    octaves.push({
+      freq: baseFreq * (1 + i * 0.9) * (0.8 + rng() * 0.4),
+      phaseX: rng() * Math.PI * 2, phaseY: rng() * Math.PI * 2,
+      angle: rng() * Math.PI * 2, amp: Math.pow(0.55, i)
+    });
+  }
+  return octaves;
+}
+function fbmNoise(octaves, x, y) {
+  let sum = 0, ampSum = 0;
+  for (const o of octaves) {
+    const rx = x * Math.cos(o.angle) - y * Math.sin(o.angle);
+    const ry = x * Math.sin(o.angle) + y * Math.cos(o.angle);
+    sum += o.amp * Math.sin(rx * o.freq + o.phaseX) * Math.cos(ry * o.freq * 0.85 + o.phaseY);
+    ampSum += o.amp;
+  }
+  return sum / ampSum;
+}
+function distToSegment(px, py, ax, ay, bx, by) {
+  const abx = bx - ax, aby = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / (abx * abx + aby * aby || 1)));
+  const projx = ax + t * abx, projy = ay + t * aby;
+  return { d: Math.sqrt((px - projx) * (px - projx) + (py - projy) * (py - projy)), t };
+}
+function makeCapsules(rng, cx, cy, baseRadius, count, opts) {
+  const capsules = [];
+  const usedAngles = [];
+  for (let i = 0; i < count; i++) {
+    let angle, tries = 0;
+    do { angle = rng() * Math.PI * 2; tries++; }
+    while (tries < 20 && usedAngles.some(a => Math.abs(((a - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI) > Math.PI - (opts.minAngleGap || 0.4)));
+    usedAngles.push(angle);
+    const originR = baseRadius * (opts.originRFactor || 0.7);
+    const baseX = cx + Math.cos(angle) * originR, baseY = cy + Math.sin(angle) * originR;
+    const length = baseRadius * (opts.lengthMin + rng() * (opts.lengthMax - opts.lengthMin));
+    const dirAngle = angle + (rng() - 0.5) * (opts.spread || 0.5);
+    const tipX = baseX + Math.cos(dirAngle) * length, tipY = baseY + Math.sin(dirAngle) * length;
+    const baseWidth = baseRadius * (opts.baseWidthMin + rng() * (opts.baseWidthMax - opts.baseWidthMin));
+    const tipWidth = baseWidth * (opts.tipWidthFactorMin + rng() * (opts.tipWidthFactorMax - opts.tipWidthFactorMin));
+    capsules.push({ baseX, baseY, tipX, tipY, baseWidth, tipWidth });
+  }
+  return capsules;
+}
+function inCapsule(x, y, cap, edgeNoise) {
+  const { d, t } = distToSegment(x, y, cap.baseX, cap.baseY, cap.tipX, cap.tipY);
+  const width = cap.baseWidth + (cap.tipWidth - cap.baseWidth) * t;
+  const jitter = edgeNoise ? (1 + fbmNoise(edgeNoise, x, y) * 0.35) : 1;
+  return d < width * jitter;
+}
+
+function makeMainlandBlobs(rng, cols, rows, minDim) {
+  const cx = cols / 2, cy = rows / 2;
+  const numBlobs = 4 + Math.floor(rng() * 3); // 4-6, gives an elongated chain
+  // Spine runs vertically (north-south) regardless of seed, with a little
+  // per-seed wobble for natural variety rather than a perfectly straight
+  // line every time. Length scales with the vertical extent (rows), not
+  // minDim, so it actually reaches into the extra vertical room.
+  const orientAngle = Math.PI / 2 + (rng() - 0.5) * 0.5;
+  const spineLength = rows * (0.85 + rng() * 0.12);
+  const perpAngle = orientAngle + Math.PI / 2;
+  const blobs = [];
+  for (let i = 0; i < numBlobs; i++) {
+    const t = numBlobs > 1 ? (i / (numBlobs - 1) - 0.5) : 0;
+    const alongX = Math.cos(orientAngle) * t * spineLength;
+    const alongY = Math.sin(orientAngle) * t * spineLength;
+    const jitter = (rng() - 0.5) * minDim * 0.16;
+    const bx = cx + alongX + Math.cos(perpAngle) * jitter + (rng() - 0.5) * minDim * 0.04;
+    const by = cy + alongY + Math.sin(perpAngle) * jitter + (rng() - 0.5) * minDim * 0.04;
+    const radius = minDim * (0.21 + rng() * 0.13);
+    blobs.push({ x: bx, y: by, radius });
+  }
+  return blobs;
+}
+function makeCapsulesFromBlobs(rng, blobs, count, opts) {
+  const capsules = [];
+  for (let i = 0; i < count; i++) {
+    const blob = blobs[Math.floor(rng() * blobs.length)];
+    const angle = rng() * Math.PI * 2;
+    const originR = blob.radius * (opts.originRFactor || 0.75);
+    const baseX = blob.x + Math.cos(angle) * originR, baseY = blob.y + Math.sin(angle) * originR;
+    const length = blob.radius * (opts.lengthMin + rng() * (opts.lengthMax - opts.lengthMin));
+    const dirAngle = angle + (rng() - 0.5) * (opts.spread || 0.5);
+    const tipX = baseX + Math.cos(dirAngle) * length, tipY = baseY + Math.sin(dirAngle) * length;
+    const baseWidth = blob.radius * (opts.baseWidthMin + rng() * (opts.baseWidthMax - opts.baseWidthMin));
+    const tipWidth = baseWidth * (opts.tipWidthFactorMin + rng() * (opts.tipWidthFactorMax - opts.tipWidthFactorMin));
+    capsules.push({ baseX, baseY, tipX, tipY, baseWidth, tipWidth });
+  }
+  return capsules;
+}
+function distToBlobs(x, y, blobs) {
+  let best = Infinity;
+  for (const b of blobs) { const d = Math.sqrt(dist2(x, y, b.x, b.y)) - b.radius; if (d < best) best = d; }
+  return best;
+}
+// Islands get one angular sector each around the map center, so they spread
+// around the whole compass instead of clustering wherever rejection
+// sampling happens to find open space (which was always the map corners).
+function placeIslandsAngular(rng, blobs, cols, rows, oceanBorder, minDim, numIslands) {
+  const cx = cols / 2, cy = rows / 2;
+  const islands = [];
+  const angleStep = (Math.PI * 2) / Math.max(numIslands, 1);
+  const angleOffset = rng() * Math.PI * 2;
+  for (let i = 0; i < numIslands; i++) {
+    let tries = 0;
+    while (tries < 250) {
+      tries++;
+      const angle = angleOffset + angleStep * i + (rng() - 0.5) * angleStep * 0.85;
+      const radiusFromCenter = minDim * (0.34 + rng() * 0.30);
+      const x = cx + Math.cos(angle) * radiusFromCenter;
+      const y = cy + Math.sin(angle) * radiusFromCenter;
+      const mainRadius = minDim * (0.055 + rng() * 0.06);
+      // 3 overlapping, well-separated sub-blobs instead of one circle, so
+      // islands read as small irregular landmasses rather than obviously
+      // cut-out disks - offsets are large enough relative to blob radius
+      // that the union is visibly elongated/lumpy, not just a fuzzy circle.
+      const numSub = 3;
+      const subBlobs = [{ x, y, radius: mainRadius }];
+      let maxReach = mainRadius;
+      const spreadAngle = rng() * Math.PI * 2;
+      for (let s = 1; s < numSub; s++) {
+        const subAngle = spreadAngle + (s - 1) * (Math.PI * 0.8 + rng() * Math.PI * 0.6);
+        const subDist = mainRadius * (0.75 + rng() * 0.55);
+        const subRadius = mainRadius * (0.55 + rng() * 0.35);
+        subBlobs.push({ x: x + Math.cos(subAngle) * subDist, y: y + Math.sin(subAngle) * subDist, radius: subRadius });
+        maxReach = Math.max(maxReach, subDist + subRadius);
+      }
+      const margin = oceanBorder + maxReach + 2;
+      if (x < margin || y < margin || x >= cols - margin || y >= rows - margin) continue;
+      if (distToBlobs(x, y, blobs) < minDim * 0.10 + (maxReach - mainRadius)) continue;
+      if (islands.some(isl => Math.sqrt(dist2(x, y, isl.x, isl.y)) < (maxReach + isl.maxReach) * 1.15)) continue;
+      const latN = Math.abs(y / rows - 0.5) * 2;
+      if (rng() > (1 - latN) * 0.85 + 0.15) continue;
+      islands.push({ x, y, subBlobs, maxReach });
+      break;
+    }
+  }
+  return islands;
+}
+
+function generatePangeaLandSea(opts) {
+  const { cols, rows, seed } = opts;
+  const oceanBorder = opts.oceanBorder != null ? opts.oceanBorder : 8;
+  const rng = mulberry32(seed);
+  const minDim = Math.min(cols, rows);
+
+  const fineNoise = makeNoiseOctaves(rng, 3, 5.5 / minDim);
+  const edgeNoise = makeNoiseOctaves(rng, 2, 9 / minDim);
+
+  const blobs = makeMainlandBlobs(rng, cols, rows, minDim);
+
+  const peninsulas = makeCapsulesFromBlobs(rng, blobs, opts.numPeninsulas != null ? opts.numPeninsulas : 8, {
+    originRFactor: 0.72, lengthMin: 0.5, lengthMax: 1.0, spread: 0.5,
+    baseWidthMin: 0.20, baseWidthMax: 0.34, tipWidthFactorMin: 0.15, tipWidthFactorMax: 0.35
+  });
+  const bays = makeCapsulesFromBlobs(rng, blobs, opts.numBays != null ? opts.numBays : 5, {
+    originRFactor: 0.25, lengthMin: 0.4, lengthMax: 0.75, spread: 0.6,
+    baseWidthMin: 0.10, baseWidthMax: 0.18, tipWidthFactorMin: 0.3, tipWidthFactorMax: 0.5
+  });
+
+  const numIslands = opts.numIslands != null ? opts.numIslands : 4;
+  const islands = placeIslandsAngular(rng, blobs, cols, rows, oceanBorder, minDim, numIslands);
+
+  function latitudeFactor(y) {
+    const latN = Math.abs(y / rows - 0.5) * 2;
+    return Math.max(0.10, 1 - Math.pow(latN, 1.7) * 1.05);
+  }
+
+  const isSea = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const idx = y * cols + x;
+      const lat = latitudeFactor(y);
+      const fine = fbmNoise(fineNoise, x, y);
+
+      let land = false;
+      for (const b of blobs) {
+        const d = Math.sqrt(dist2(x, y, b.x, b.y));
+        if (d < b.radius * lat * (1 + fine * 0.20)) { land = true; break; }
+      }
+      if (!land) {
+        for (const p of peninsulas) {
+          if (inCapsule(x, y, p, edgeNoise) && distToBlobs(x, y, blobs) < blobs[0].radius * 2.2 * lat) { land = true; break; }
+        }
+      }
+      if (land) { for (const b2 of bays) { if (inCapsule(x, y, b2, edgeNoise)) { land = false; break; } } }
+      if (!land) {
+        for (const isl of islands) {
+          for (const sb of isl.subBlobs) {
+            const d = Math.sqrt(dist2(x, y, sb.x, sb.y));
+            if (d < sb.radius * lat * (1 + fine * 0.3)) { land = true; break; }
+          }
+          if (land) break;
+        }
+      }
+      isSea[idx] = land ? 0 : 1;
+    }
+  }
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    if (x < oceanBorder || y < oceanBorder || x >= cols - oceanBorder || y >= rows - oceanBorder) isSea[y * cols + x] = 1;
+  }
+
+  // Coastline erosion: bite chunks out of the smooth blob/capsule edges so
+  // the coast reads as naturally carved rather than a set of smooth balls.
+  // Multiple light passes (rather than one heavy one) give a more organic,
+  // fractal-like edge and are less likely to sever a peninsula outright.
+  const erosionPasses = opts.erosionPasses != null ? opts.erosionPasses : 3;
+  const erosionProb = opts.erosionProb != null ? opts.erosionProb : 0.30;
+  for (let p = 0; p < erosionPasses; p++) {
+    const toErode = [];
+    for (let y = oceanBorder; y < rows - oceanBorder; y++) {
+      for (let x = oceanBorder; x < cols - oceanBorder; x++) {
+        const idx = y * cols + x;
+        if (isSea[idx]) continue;
+        let coastal = false;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (isSea[(y + dy) * cols + (x + dx)]) { coastal = true; break; }
+        }
+        if (coastal && rng() < erosionProb) toErode.push(idx);
+      }
+    }
+    for (const idx of toErode) isSea[idx] = 1;
+  }
+
+  return { cols, rows, isSea };
+}
+
+// Connected-component labeling: continents are whatever land regions are
+// ACTUALLY connected, guaranteed correct regardless of how organic the
+// coastline is (unlike anchor-based assignment, which assumes clean cells).
+function labelContinents(cols, rows, isSea) {
+  const label = new Int16Array(cols * rows).fill(-1);
+  let nextLabel = 0;
+  const stack = [];
+  for (let start = 0; start < cols * rows; start++) {
+    if (isSea[start] || label[start] !== -1) continue;
+    label[start] = nextLabel;
+    stack.push(start);
+    while (stack.length) {
+      const idx = stack.pop();
+      const x = idx % cols, y = (idx / cols) | 0;
+      const nbs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const [dx, dy] of nbs) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+        const nIdx = ny * cols + nx;
+        if (!isSea[nIdx] && label[nIdx] === -1) { label[nIdx] = nextLabel; stack.push(nIdx); }
+      }
+    }
+    nextLabel++;
+  }
+  return { label, numContinents: nextLabel };
+}
+
+// Shared downstream pipeline: given a finished land/sea grid and a
+// per-cell continent label, place territory seeds, subdivide land into
+// territories, compute adjacency/coastal flags/naval lanes.
+// Coastal territories that end up very small (a jagged erosion remnant or a
+// thin peninsula tip) get topped up with a few adjacent sea cells so they're
+// not annoyingly tiny - only works on cells actually touching sea, so a
+// landlocked small territory is naturally left alone (nothing to claim).
+function growTinyCoastalTerritories(cols, rows, isSea, cellTerritory, numTerritories, minSize) {
+  const cellsByTerritory = Array.from({ length: numTerritories }, () => []);
+  for (let i = 0; i < cols * rows; i++) { const t = cellTerritory[i]; if (t !== -1) cellsByTerritory[t].push(i); }
+
+  const margin = 3; // stay clear of the outer ocean-border ring
+  for (let t = 0; t < numTerritories; t++) {
+    const cells = cellsByTerritory[t];
+    if (cells.length >= minSize) continue;
+    let guard = 0;
+    while (cells.length < minSize && guard < minSize * 6) {
+      guard++;
+      let claimed = -1;
+      for (const idx of cells) {
+        const x = idx % cols, y = (idx / cols) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < margin || ny < margin || nx >= cols - margin || ny >= rows - margin) continue;
+          const nIdx = ny * cols + nx;
+          if (isSea[nIdx]) { claimed = nIdx; break; }
+        }
+        if (claimed !== -1) break;
+      }
+      if (claimed === -1) break;
+      isSea[claimed] = 0;
+      cellTerritory[claimed] = t;
+      cells.push(claimed);
+    }
+  }
+}
+
+function buildTerritoriesFromLandSea(cols, rows, isSea, cellContinent, numContinents, rng, opts) {
+  const targetCellsPerTerritory = opts.cellsPerTerritory || 55;
+  const [minT, maxT] = opts.territoriesPerContinentRange || [2, 9999];
+
+  const landCellsByContinent = Array.from({ length: numContinents }, () => []);
+  for (let i = 0; i < cols * rows; i++) if (!isSea[i]) landCellsByContinent[cellContinent[i]].push(i);
+
+  const territorySeeds = [];
+  for (let c = 0; c < numContinents; c++) {
+    const land = landCellsByContinent[c];
+    if (land.length < 8) {
+      // Too small to subdivide into a territory - rather than leave these
+      // cells marked as land with no territory assignment (which would
+      // crash rendering on an unassigned cellTerritory=-1 lookup), convert
+      // them back to sea so the map stays internally consistent.
+      for (const idx of land) isSea[idx] = 1;
+      continue;
+    }
+    const count = Math.max(minT, Math.min(maxT, Math.round(land.length / targetCellsPerTerritory)));
+    const chosen = [];
+    let tries = 0;
+    while (chosen.length < count && tries < 4000) {
+      tries++;
+      const cellIdx = land[Math.floor(rng() * land.length)];
+      const cx = cellIdx % cols, cy = Math.floor(cellIdx / cols);
+      const minSep2 = Math.pow(Math.sqrt(land.length) / (count * 0.5), 2);
+      if (chosen.every(s => dist2(s.x, s.y, cx, cy) > minSep2)) chosen.push({ x: cx, y: cy });
+    }
+    for (const s of chosen) territorySeeds.push({ x: s.x, y: s.y, continent: c });
+    if (chosen.length === 0) {
+      const idx = land[0];
+      territorySeeds.push({ x: idx % cols, y: Math.floor(idx / cols), continent: c });
+    }
+  }
+
+  const cellTerritory = new Int16Array(cols * rows).fill(-1);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const idx = y * cols + x;
+    if (isSea[idx]) continue;
+    const cont = cellContinent[idx];
+    let best = -1, bestD = Infinity;
+    for (let s = 0; s < territorySeeds.length; s++) {
+      if (territorySeeds[s].continent !== cont) continue;
+      const d = dist2(x, y, territorySeeds[s].x, territorySeeds[s].y);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    cellTerritory[idx] = best;
+  }
+
+  growTinyCoastalTerritories(cols, rows, isSea, cellTerritory, territorySeeds.length, opts.minCoastalSize || 15);
+
+  const numTerritories = territorySeeds.length;
+  const adjacency = Array.from({ length: numTerritories }, () => new Set());
+  const isCoastal = new Uint8Array(numTerritories);
+  const cellCount = new Int32Array(numTerritories);
+  const sumX = new Float64Array(numTerritories), sumY = new Float64Array(numTerritories);
+
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const idx = y * cols + x;
+    const t = cellTerritory[idx];
+    if (t === -1) continue;
+    cellCount[t]++; sumX[t] += x; sumY[t] += y;
+    const nbs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of nbs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) { isCoastal[t] = 1; continue; }
+      const nIdx = ny * cols + nx;
+      if (isSea[nIdx]) { isCoastal[t] = 1; continue; }
+      const nt = cellTerritory[nIdx];
+      if (nt !== -1 && nt !== t) adjacency[t].add(nt);
+    }
+  }
+
+  function continentOf(t) { return territorySeeds[t].continent; }
+  const navalLanes = [];
+  for (let c1 = 0; c1 < numContinents; c1++) {
+    for (let c2 = c1 + 1; c2 < numContinents; c2++) {
+      let best = null, bestD = Infinity;
+      for (let t1 = 0; t1 < numTerritories; t1++) {
+        if (continentOf(t1) !== c1 || !isCoastal[t1]) continue;
+        for (let t2 = 0; t2 < numTerritories; t2++) {
+          if (continentOf(t2) !== c2 || !isCoastal[t2]) continue;
+          const d = dist2(sumX[t1] / cellCount[t1], sumY[t1] / cellCount[t1], sumX[t2] / cellCount[t2], sumY[t2] / cellCount[t2]);
+          if (d < bestD) { bestD = d; best = [t1, t2]; }
+        }
+      }
+      if (best) navalLanes.push(best);
+    }
+  }
+  const navalNeighbors = Array.from({ length: numTerritories }, () => new Set());
+  for (const [a, b] of navalLanes) { navalNeighbors[a].add(b); navalNeighbors[b].add(a); }
+
+  const centroids = [];
+  for (let t = 0; t < numTerritories; t++) centroids.push({ x: sumX[t] / cellCount[t], y: sumY[t] / cellCount[t] });
+
+  const continentsUsed = [];
+  for (let c = 0; c < numContinents; c++) {
+    const members = [];
+    for (let t = 0; t < numTerritories; t++) if (territorySeeds[t].continent === c) members.push(t);
+    if (members.length > 0) continentsUsed.push({ id: c, territoryIds: members });
+  }
+
+  return {
+    cols, rows, numTerritories, adjacency, isCoastal, cellCount, centroids,
+    navalLanes, navalNeighbors, territorySeeds, cellTerritory, isSea, continents: continentsUsed
+  };
+}
+
+function generatePangeaWorld(opts) {
+  const rng = mulberry32(opts.seed);
+  const { cols, rows, isSea } = generatePangeaLandSea(opts);
+  const { label, numContinents } = labelContinents(cols, rows, isSea);
+  return buildTerritoriesFromLandSea(cols, rows, isSea, label, numContinents, rng, opts);
+}
+
+function generateMap(opts) {
+  const { cols, rows, numContinents, territoriesPerContinentRange, seed, cellsPerTerritory } = opts;
+  const targetCellsPerTerritory = cellsPerTerritory || 55;
+  const rng = mulberry32(seed);
+
+  const anchors = [];
+  let attempts = 0;
+  const minSpacing2 = Math.pow(Math.min(cols, rows) / (numContinents * 0.65), 2);
+  while (anchors.length < numContinents && attempts < 5000) {
+    attempts++;
+    const x = 4 + rng() * (cols - 8);
+    const y = 4 + rng() * (rows - 8);
+    if (anchors.every(a => dist2(a.x, a.y, x, y) > minSpacing2)) anchors.push({ x, y });
+  }
+  while (anchors.length < numContinents) anchors.push({ x: rng() * cols, y: rng() * rows });
+
+  const cellContinent = new Int16Array(cols * rows);
+  const nearest2 = new Float64Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let best = -1, bestD = Infinity, secondD = Infinity;
+      for (let i = 0; i < anchors.length; i++) {
+        const d = dist2(x, y, anchors[i].x, anchors[i].y);
+        if (d < bestD) { secondD = bestD; bestD = d; best = i; }
+        else if (d < secondD) { secondD = d; }
+      }
+      const idx = y * cols + x;
+      cellContinent[idx] = best;
+      nearest2[idx] = secondD - bestD;
+    }
+  }
+
+  const seaMarginThreshold = Math.pow(Math.min(cols, rows) * (opts.seaFactor || 0.10), 2);
+  const isSea = new Uint8Array(cols * rows);
+  for (let i = 0; i < cols * rows; i++) if (nearest2[i] < seaMarginThreshold) isSea[i] = 1;
+  const oceanBorder = opts.oceanBorder != null ? opts.oceanBorder : 1;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    if (x < oceanBorder || y < oceanBorder || x >= cols - oceanBorder || y >= rows - oceanBorder) isSea[y * cols + x] = 1;
+  }
+
+  // ---- Land bridges (chokepoints): force a narrow strip of land between a
+  // few of the closest continent-anchor pairs, cutting through the ocean
+  // erosion buffer to create a deliberately defensible isthmus. ----
+  const numLandBridges = opts.numLandBridges || 0;
+  if (numLandBridges > 0) {
+    const bridgeWidth = opts.bridgeWidth != null ? opts.bridgeWidth : 1.1;
+    const pairs = [];
+    for (let i = 0; i < anchors.length; i++) {
+      for (let j = i + 1; j < anchors.length; j++) {
+        pairs.push({ i, j, d: dist2(anchors[i].x, anchors[i].y, anchors[j].x, anchors[j].y) });
+      }
+    }
+    pairs.sort((a, b) => a.d - b.d);
+    const chosen = pairs.slice(0, Math.min(numLandBridges, pairs.length));
+    for (const { i, j } of chosen) {
+      const A = anchors[i], B = anchors[j];
+      const abx = B.x - A.x, aby = B.y - A.y;
+      const abLen2 = abx * abx + aby * aby || 1;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (x < oceanBorder || y < oceanBorder || x >= cols - oceanBorder || y >= rows - oceanBorder) continue;
+          const apx = x - A.x, apy = y - A.y;
+          let t = (apx * abx + apy * aby) / abLen2;
+          t = Math.max(0, Math.min(1, t));
+          const projx = A.x + t * abx, projy = A.y + t * aby;
+          const perpD2 = dist2(x, y, projx, projy);
+          if (perpD2 < bridgeWidth * bridgeWidth) {
+            const idx = y * cols + x;
+            isSea[idx] = 0;
+            cellContinent[idx] = dist2(x, y, A.x, A.y) < dist2(x, y, B.x, B.y) ? i : j;
+          }
+        }
+      }
+    }
+  }
+
+  const landCellsByContinent = Array.from({ length: numContinents }, () => []);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const idx = y * cols + x;
+    if (!isSea[idx]) landCellsByContinent[cellContinent[idx]].push(idx);
+  }
+
+  const territorySeeds = [];
+  for (let c = 0; c < numContinents; c++) {
+    const land = landCellsByContinent[c];
+    if (land.length < 20) continue;
+    const [minT, maxT] = territoriesPerContinentRange;
+    const count = Math.max(minT, Math.min(maxT, Math.round(land.length / targetCellsPerTerritory)));
+    const chosen = [];
+    let tries = 0;
+    while (chosen.length < count && tries < 3000) {
+      tries++;
+      const cellIdx = land[Math.floor(rng() * land.length)];
+      const cx = cellIdx % cols, cy = Math.floor(cellIdx / cols);
+      const minSep2 = Math.pow(Math.sqrt(land.length) / (count * 0.5), 2);
+      if (chosen.every(s => dist2(s.x, s.y, cx, cy) > minSep2)) chosen.push({ x: cx, y: cy });
+    }
+    for (const s of chosen) territorySeeds.push({ x: s.x, y: s.y, continent: c });
+  }
+
+  const cellTerritory = new Int16Array(cols * rows).fill(-1);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const idx = y * cols + x;
+    if (isSea[idx]) continue;
+    const cont = cellContinent[idx];
+    let best = -1, bestD = Infinity;
+    for (let s = 0; s < territorySeeds.length; s++) {
+      if (territorySeeds[s].continent !== cont) continue;
+      const d = dist2(x, y, territorySeeds[s].x, territorySeeds[s].y);
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    cellTerritory[idx] = best;
+  }
+
+  const numTerritories = territorySeeds.length;
+  const adjacency = Array.from({ length: numTerritories }, () => new Set());
+  const isCoastal = new Uint8Array(numTerritories);
+  const cellCount = new Int32Array(numTerritories);
+  const sumX = new Float64Array(numTerritories), sumY = new Float64Array(numTerritories);
+
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const idx = y * cols + x;
+    const t = cellTerritory[idx];
+    if (t === -1) continue;
+    cellCount[t]++; sumX[t] += x; sumY[t] += y;
+    const nbs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of nbs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const nIdx = ny * cols + nx;
+      if (isSea[nIdx]) { isCoastal[t] = 1; continue; }
+      const nt = cellTerritory[nIdx];
+      if (nt !== -1 && nt !== t) adjacency[t].add(nt);
+    }
+  }
+
+  function continentOf(t) { return territorySeeds[t].continent; }
+
+  const navalLanes = [];
+  for (let c1 = 0; c1 < numContinents; c1++) {
+    for (let c2 = c1 + 1; c2 < numContinents; c2++) {
+      let best = null, bestD = Infinity;
+      for (let t1 = 0; t1 < numTerritories; t1++) {
+        if (continentOf(t1) !== c1 || !isCoastal[t1]) continue;
+        for (let t2 = 0; t2 < numTerritories; t2++) {
+          if (continentOf(t2) !== c2 || !isCoastal[t2]) continue;
+          const d = dist2(sumX[t1] / cellCount[t1], sumY[t1] / cellCount[t1], sumX[t2] / cellCount[t2], sumY[t2] / cellCount[t2]);
+          if (d < bestD) { bestD = d; best = [t1, t2]; }
+        }
+      }
+      if (best) navalLanes.push(best);
+    }
+  }
+
+  const navalNeighbors = Array.from({ length: numTerritories }, () => new Set());
+  for (const [a, b] of navalLanes) { navalNeighbors[a].add(b); navalNeighbors[b].add(a); }
+
+  const centroids = [];
+  for (let t = 0; t < numTerritories; t++) {
+    centroids.push({ x: sumX[t] / cellCount[t], y: sumY[t] / cellCount[t] });
+  }
+
+  const continentsUsed = [];
+  for (let c = 0; c < numContinents; c++) {
+    const members = [];
+    for (let t = 0; t < numTerritories; t++) if (territorySeeds[t].continent === c) members.push(t);
+    if (members.length > 0) continentsUsed.push({ id: c, territoryIds: members });
+  }
+
+  return {
+    cols, rows, numTerritories, adjacency, isCoastal, cellCount, centroids,
+    navalLanes, navalNeighbors, territorySeeds, cellTerritory, isSea, continents: continentsUsed
+  };
+}
+
+// ---------------- Terrain ----------------
+// Latitude-aware: ice caps at the poles, forest-heavy belt at the equator,
+// mixed plains/desert/mountains in between — mirrors Earth's biome bands.
+const TERRAIN_DEFS = {
+  plains: { label: 'Plains', bonus: 0, armyCap: 4, widthCeiling: 12 },
+  forest: { label: 'Forest', bonus: 0.15, armyCap: 2, widthCeiling: 8 },
+  desert: { label: 'Desert', bonus: 0.05, armyCap: 2, widthCeiling: 12 },
+  mountains: { label: 'Mountains', bonus: 0.30, armyCap: 1.5, widthCeiling: 5 },
+  ice: { label: 'Ice', bonus: 0.10, armyCap: 1.5, widthCeiling: 8 }
+};
+const ARMY_CAP_BASE = 20;
+// latNorm: 0 = equator, 1 = pole.
+function pickTerrainByLatitude(rng, latNorm) {
+  const iceP = Math.pow(Math.max(0, (latNorm - 0.62) / 0.38), 1.6) * 0.85;
+  const forestBonus = Math.max(0, 1 - latNorm / 0.55) * 0.30;
+  let plains = 0.63, mountains = 0.12, desert = 0.12, forest = 0.13 + forestBonus;
+  const nonIceSum = plains + mountains + desert + forest;
+  const scale = (1 - iceP) / nonIceSum;
+  plains *= scale; mountains *= scale; desert *= scale; forest *= scale;
+
+  const r = rng();
+  if (r < iceP) return 'ice';
+  let acc = iceP;
+  acc += plains; if (r < acc) return 'plains';
+  acc += forest; if (r < acc) return 'forest';
+  acc += mountains; if (r < acc) return 'mountains';
+  return 'desert';
+}
+
+// ---------------- Combat ----------------
+// navalPenalty: 1 for land attacks; computed by the caller for naval-lane or
+// open-sea attacks, since the right penalty depends on tech and attack kind.
+// Returns { attackerWins, defenderArmiesAfter, attackerArmiesAfter, movedIn, attackPower, defensePower }
+function resolveCombat(rng, attackerArmies, defenderArmies, attackMult, defenseMult, navalPenalty) {
+  const navalP = navalPenalty == null ? 1 : navalPenalty;
+  const attackPower = attackerArmies * (0.85 + rng() * 0.3) * attackMult * navalP;
+  const defensePower = defenderArmies * (0.85 + rng() * 0.3) * defenseMult;
+  const winProb = attackPower / (attackPower + defensePower);
+  const attackerWins = rng() < winProb;
+
+  if (attackerWins) {
+    const movedIn = Math.max(1, Math.min(attackerArmies - 1, Math.round(attackerArmies * 0.6)));
+    return {
+      attackerWins: true,
+      attackerArmiesAfter: attackerArmies - movedIn,
+      defenderArmiesAfter: 0,
+      movedIn, attackPower, defensePower
+    };
+  } else {
+    // A failed attack should genuinely hurt, and hurt worse the more
+    // one-sided it was: a near-coinflip loss is bad luck (~54-70% lost),
+    // but a hopeless attack that predictably fails is reckless and pays
+    // for it (up to ~86% lost). This replaces a flat 40% loss, which made
+    // attacking feel close to risk-free since only a modest, capped slice
+    // of the army was ever at stake.
+    const lossFraction = 0.5 + (1 - winProb) * 0.4;
+    // BUG FIX: the loss was capped at (attackerArmies - 1), meant to leave
+    // at least 1 survivor retreating from a failed attack. But when only 1
+    // army is committed, that cap becomes min(0, ...) = 0 - meaning a
+    // 1-army attack could NEVER lose anything on failure, letting it be
+    // repeated for free, indefinitely, until it eventually won by chance.
+    // The cap is now the full committed force, so a lone army that loses
+    // is actually lost, like any other size of attack.
+    const loss = Math.min(attackerArmies, Math.max(1, Math.ceil(attackerArmies * lossFraction)));
+    const defLoss = Math.max(0, Math.min(defenderArmies - 1, Math.floor(defenderArmies * 0.15)));
+    return {
+      attackerWins: false,
+      attackerArmiesAfter: attackerArmies - loss,
+      defenderArmiesAfter: defenderArmies - defLoss,
+      movedIn: 0, attackPower, defensePower
+    };
+  }
+}
+
+// ---------------- Tech ----------------
+const TECH_DEFS = {
+  fortification: { name: 'Fortifications', desc: 'Defense strength per level', maxLevel: 3 },
+  siege: { name: 'Siege Engineering', desc: 'Attack strength per level', maxLevel: 3 },
+  naval: { name: 'Naval Doctrine', desc: 'Reduces amphibious assault penalty; max level unlocks open-sea invasion of coastal Plains from any coast', maxLevel: 3 },
+  logistics: { name: 'Logistics', desc: 'Extra reinforcements per turn', maxLevel: 3 },
+  movement: { name: 'Movement', desc: 'Reduces the gold cost of moving armies', maxLevel: 3 }
+};
+const TECH_COST_BASE = 50; // level 1 costs 50, level 2 costs 100, level 3 costs 150
+const ARMY_PURCHASE_COST = 10; // flat, buys 1 army (respecting the cap)
+const MOVE_COST = 5; // base cost per use of Move/Fortify, reduced by Movement tech
+function moveCostFor(tech) {
+  return Math.max(1, MOVE_COST - (tech.movement || 0));
+}
+function techCost(key, currentLevel) {
+  return TECH_COST_BASE * (currentLevel + 1);
+}
+function attackMultiplier(tech) { return 1 + (tech.siege || 0) * 0.15; }
+// A territory's physical size caps how many armies can actually commit to
+// a single attack launched from it - a narrow, small territory can't funnel
+// an unlimited force through its border. Scales with the square root of
+// cell count (area), since frontage/width scales with sqrt(area) for a
+// roughly compact shape.
+function maxCommittableArmies(cellCount, terrain) {
+  const sizeBased = Math.max(2, Math.round(Math.sqrt(cellCount) * 2));
+  const ceiling = terrain ? TERRAIN_DEFS[terrain].widthCeiling : Infinity;
+  return Math.min(sizeBased, ceiling);
+}
+function defenseMultiplier(tech, terrainBonus) { return 1 + (tech.fortification || 0) * 0.15 + (terrainBonus || 0); }
+function reinforcementTechBonus(tech) { return (tech.logistics || 0); }
+
+// ---------------- Reinforcement ----------------
+function computeReinforcement(nationTerritoryCount, fullyOwnedContinents, tech) {
+  let base = Math.max(3, Math.floor(nationTerritoryCount / 3));
+  let continentBonus = 0;
+  for (const c of fullyOwnedContinents) continentBonus += Math.round(c.territoryIds.length / 2);
+  return base + continentBonus + reinforcementTechBonus(tech);
+}
+// Gold is deliberately scarce now that it buys things directly (10g/army,
+// 100g/tech level, 5g/move) - a much lower per-territory trickle than the
+// old "1 gold per territory" rate, so those purchases stay meaningful
+// choices rather than something every nation can spam every turn.
+function computeGoldIncome(nationTerritoryCount, fullyOwnedContinents) {
+  let bonus = 0;
+  for (const c of fullyOwnedContinents) bonus += Math.round(c.territoryIds.length * 0.3);
+  return Math.max(1, Math.round(nationTerritoryCount * 0.3)) + bonus;
+}
+
+// ---------------- Diplomacy ----------------
+// relation score range [-100,100]. AI accepts alliance/peace if relation + strength factors clear threshold.
+function aiEvaluateProposal(relation, myStrength, theirStrength, type) {
+  const ratio = myStrength / Math.max(1, theirStrength);
+  let threshold = type === 'alliance' ? 20 : -10; // alliance harder to get than peace
+  let strengthFactor = ratio < 0.8 ? 15 : (ratio > 1.5 ? -15 : 0); // weak nations want protection
+  return (relation + strengthFactor) >= threshold;
+}
+
+// ---------------- Exports ----------------
+// NOTE: top-level `const`/`let` declarations do NOT become `window`
+// properties in a classic (non-module) script, unlike `function` or `var`.
+// So in the browser we must attach these explicitly, or later concatenated
+// scripts that read them off `window` (see game-logic.js's `root` fallback)
+// would see `undefined`.
+const CORE_EXPORTS = {
+  mulberry32, dist2, clamp, choice, shuffle,
+  genName, genContinentName, NATION_NAMES, SCIENTIST_NAMES, pickScientistNames,
+  generateMap, generatePangeaWorld, resolveCombat, TECH_DEFS, techCost,
+  TECH_COST_BASE, ARMY_PURCHASE_COST, MOVE_COST, moveCostFor,
+  TERRAIN_DEFS, ARMY_CAP_BASE, pickTerrainByLatitude,
+  attackMultiplier, defenseMultiplier, maxCommittableArmies, reinforcementTechBonus,
+  computeReinforcement, computeGoldIncome, aiEvaluateProposal
+};
+if (typeof module !== 'undefined') {
+  module.exports = CORE_EXPORTS;
+} else {
+  Object.assign((typeof window !== 'undefined' ? window : globalThis), CORE_EXPORTS);
+}
+
+// ============================================================
+// GAME STATE & TURN LOGIC — no DOM references.
+// Requires core.js to be loaded first (in-browser: concatenated;
+// in Node tests: required separately).
+// ============================================================
+(function (root) {
+  const core = (typeof module !== 'undefined') ? require('./core.js') : root;
+  const { mulberry32, choice, shuffle, dist2, genContinentName, NATION_NAMES, pickScientistNames,
+    generateMap, generatePangeaWorld, resolveCombat, TECH_DEFS, techCost, TECH_COST_BASE, ARMY_PURCHASE_COST, MOVE_COST, moveCostFor,
+    TERRAIN_DEFS, ARMY_CAP_BASE, pickTerrainByLatitude,
+    attackMultiplier, defenseMultiplier, maxCommittableArmies, computeReinforcement, computeGoldIncome } = core;
+
+  function computeArmyCap(state, nationId) {
+    let cap = ARMY_CAP_BASE;
+    for (const t of state.territories) if (t.owner === nationId) cap += TERRAIN_DEFS[t.terrain].armyCap;
+    return Math.round(cap);
+  }
+  function capReinforcement(state, nationId, rawPool) {
+    const cap = computeArmyCap(state, nationId);
+    const headroom = Math.max(0, cap - nationStrength(state, nationId));
+    return Math.min(rawPool, headroom);
+  }
+
+  function getPlayer(state, id) { return state.players[id]; }
+  function logMsg(state, text) {
+    state.log.push({ round: state.round, text });
+    if (state.log.length > 300) state.log.shift();
+  }
+  function countTerritories(state, nationId) {
+    let n = 0;
+    for (const t of state.territories) if (t.owner === nationId) n++;
+    return n;
+  }
+  function fullyOwnedContinents(state, nationId) {
+    const out = [];
+    for (const cid in state.continents) {
+      const c = state.continents[cid];
+      if (c.territoryIds.every(tid => state.territories[tid].owner === nationId)) out.push(c);
+    }
+    return out;
+  }
+  function nationStrength(state, nationId) {
+    let s = 0;
+    for (const t of state.territories) if (t.owner === nationId) s += t.armies;
+    return s;
+  }
+
+  function recomputeVisibility(state) {
+    if (state.godMode) {
+      const all = new Set();
+      for (const t of state.territories) all.add(t.id);
+      state.visibleNow = all;
+      for (const t of state.territories) state.everKnown.set(t.id, { owner: t.owner, armies: t.armies });
+      return;
+    }
+    const visible = new Set();
+    for (const t of state.territories) {
+      if (t.owner === 0) {
+        visible.add(t.id);
+        for (const nb of t.neighbors) visible.add(nb);
+        for (const nb of t.navalNeighbors) visible.add(nb);
+      }
+    }
+    state.visibleNow = visible;
+    for (const id of visible) {
+      state.everKnown.set(id, { owner: state.territories[id].owner, armies: state.territories[id].armies });
+    }
+  }
+
+  // ---------------- Capital ----------------
+  const CAPITAL_SELECTION_ROUND = 10;
+  const CAPITAL_GOLD_BONUS = 3;
+  const CAPITAL_REINFORCEMENT_BONUS = 1;
+  function hasCapital(state, nationId) {
+    const player = getPlayer(state, nationId);
+    return player.capitalId != null && state.territories[player.capitalId] && state.territories[player.capitalId].owner === nationId;
+  }
+  function capitalGoldBonus(state, nationId) { return hasCapital(state, nationId) ? CAPITAL_GOLD_BONUS : 0; }
+  function capitalReinforcementBonus(state, nationId) { return hasCapital(state, nationId) ? CAPITAL_REINFORCEMENT_BONUS : 0; }
+  function setCapital(state, nationId, territoryId) {
+    const t = state.territories[territoryId];
+    if (!t || t.owner !== nationId) return false;
+    const player = getPlayer(state, nationId);
+    player.capitalId = territoryId;
+    logMsg(state, `${player.name} designates ${t.name} as their capital — it grants +${CAPITAL_GOLD_BONUS}g and +${CAPITAL_REINFORCEMENT_BONUS} reinforcement per round, but losing it means immediate defeat.`);
+    return true;
+  }
+  function chooseCapitalHeuristic(state, nationId) {
+    const owned = state.territories.filter(t => t.owner === nationId);
+    if (!owned.length) return null;
+    // Prefer a well-garrisoned, non-coastal (less exposed) territory.
+    owned.sort((a, b) => (b.armies - a.armies) || ((a.isCoastal ? 1 : 0) - (b.isCoastal ? 1 : 0)));
+    return owned[0].id;
+  }
+  function triggerCapitalSelection(state) {
+    for (const p of state.players) {
+      if (!p.alive || p.capitalId != null) continue;
+      if (p.isHuman) {
+        state.needsCapitalChoice = true;
+      } else {
+        const cid = chooseCapitalHeuristic(state, p.id);
+        if (cid != null) setCapital(state, p.id, cid);
+      }
+    }
+  }
+  // A captured capital doesn't just fall - the whole nation collapses:
+  // every other territory it held (each keeping half its garrison, minimum
+  // 1) is annexed by the conqueror in the same stroke, and the defeated
+  // nation is eliminated immediately regardless of how much land it still
+  // held. This is what keeps games from dragging on long after they're
+  // effectively decided.
+  function annexDefeatedNation(state, defeatedNationId, conquerorId) {
+    const defeatedPlayer = getPlayer(state, defeatedNationId);
+    const remaining = state.territories.filter(t => t.owner === defeatedNationId);
+    for (const t of remaining) {
+      t.owner = conquerorId;
+      t.armies = Math.max(1, Math.floor(t.armies / 2));
+    }
+    defeatedPlayer.alive = false;
+    defeatedPlayer.capitalId = null;
+    logMsg(state, `${getPlayer(state, conquerorId).name} captures ${defeatedPlayer.name}'s capital — the nation collapses, and ${remaining.length} more territories are annexed!`);
+  }
+
+  function checkEliminations(state) {
+    for (const p of state.players) {
+      if (!p.alive) continue;
+      if (countTerritories(state, p.id) === 0) {
+        p.alive = false;
+        logMsg(state, `${p.name} has been eliminated!`);
+      }
+    }
+  }
+
+  function scoreOf(state, nationId) {
+    return countTerritories(state, nationId) * 10 + nationStrength(state, nationId) + getPlayer(state, nationId).gold;
+  }
+
+  function checkWinCondition(state) {
+    if (state.gameOver) return;
+    const human = getPlayer(state, 0);
+    if (!human.alive) { state.gameOver = { winnerId: null, reason: 'defeat' }; return; }
+    const aliveMajors = state.players.filter(p => p.alive);
+    if (aliveMajors.length === 1) {
+      const w = aliveMajors[0];
+      state.gameOver = { winnerId: w.id, reason: w.id === 0 ? 'victory' : 'defeat' };
+      return;
+    }
+    if (state.round >= 100) {
+      let best = aliveMajors[0];
+      for (const p of aliveMajors) if (scoreOf(state, p.id) > scoreOf(state, best.id)) best = p;
+      state.gameOver = { winnerId: best.id, reason: best.id === 0 ? 'victory-score' : 'defeat-score' };
+    }
+  }
+
+  // ---------------- Setup ----------------
+  // Multi-start farthest-point sampling: a single greedy pass can end up
+  // mediocre if its random starting point happens to sit in an awkward
+  // spot, so try several different starts and keep whichever run actually
+  // maximizes the worst-case (closest) pair of capitals - directly
+  // optimizing for "factions start far enough apart" rather than hoping
+  // one greedy attempt gets it right.
+  function pickCapitals(rng, territories, numCapitals, eligibleIds) {
+    const pool = eligibleIds && eligibleIds.length >= numCapitals ? eligibleIds : territories.map(t => t.id);
+
+    function runFromStart(startIdx) {
+      const capitals = [startIdx];
+      while (capitals.length < numCapitals) {
+        let best = -1, bestDist = -1;
+        for (const i of pool) {
+          if (capitals.includes(i)) continue;
+          let minD = Infinity;
+          for (const c of capitals) {
+            const d = dist2(territories[i].centroid.x, territories[i].centroid.y, territories[c].centroid.x, territories[c].centroid.y);
+            if (d < minD) minD = d;
+          }
+          if (minD > bestDist) { bestDist = minD; best = i; }
+        }
+        capitals.push(best);
+      }
+      let overallMin = Infinity;
+      for (let a = 0; a < capitals.length; a++) for (let b = a + 1; b < capitals.length; b++) {
+        const d = dist2(territories[capitals[a]].centroid.x, territories[capitals[a]].centroid.y, territories[capitals[b]].centroid.x, territories[capitals[b]].centroid.y);
+        if (d < overallMin) overallMin = d;
+      }
+      return { capitals, overallMin };
+    }
+
+    const numTries = Math.min(pool.length, 8);
+    let bestResult = null;
+    const triedStarts = new Set();
+    for (let i = 0; i < numTries; i++) {
+      let startIdx, guard = 0;
+      do { startIdx = pool[Math.floor(rng() * pool.length)]; guard++; } while (triedStarts.has(startIdx) && guard < 20);
+      triedStarts.add(startIdx);
+      const result = runFromStart(startIdx);
+      if (!bestResult || result.overallMin > bestResult.overallMin) bestResult = result;
+    }
+    return bestResult.capitals;
+  }
+  function buildStartingClaims(rng, territories, numNations, perNationCount, eligibleIds) {
+    const n = territories.length;
+    const capitals = pickCapitals(rng, territories, numNations, eligibleIds);
+    const owner = new Array(n).fill(-1);
+    capitals.forEach((c, i) => owner[c] = i);
+    const perNationCap = Math.max(1, perNationCount);
+    const counts = new Array(numNations).fill(1);
+    let progress = true;
+    while (progress) {
+      progress = false;
+      for (let i = 0; i < numNations; i++) {
+        if (counts[i] >= perNationCap) continue;
+        const candidates = [];
+        for (let t = 0; t < n; t++) {
+          if (owner[t] !== i) continue;
+          for (const nb of territories[t].neighbors) if (owner[nb] === -1) candidates.push(nb);
+        }
+        if (!candidates.length) continue;
+        const pick = candidates[Math.floor(rng() * candidates.length)];
+        owner[pick] = i;
+        counts[i]++;
+        progress = true;
+      }
+    }
+    return { owner, capitals };
+  }
+
+  function createInitialState(opts) {
+    const { seed, humanName, godMode, hardMode } = opts;
+    const rng = mulberry32(seed);
+    // One large pangea with organic peninsulas/bays plus a few islands,
+    // ~80-90 territories, land favored near the equator and sparse at the
+    // poles. 200x200 grid.
+    // Portrait aspect (taller than wide) so the world reliably expands more
+    // vertically than horizontally, regardless of seed - same total area as
+    // the previous 200x200 square (160*250=40000) so territory count stays
+    // in the same range.
+    const cols = 160, rows = 250;
+    const map = generatePangeaWorld({
+      cols, rows, seed, oceanBorder: 8, numIslands: 4, numPeninsulas: 6, numBays: 4,
+      cellsPerTerritory: 95, territoriesPerContinentRange: [2, 80], erosionPasses: 4, erosionProb: 0.32
+    });
+
+    const continentNames = {};
+    for (const c of map.continents) continentNames[c.id] = genContinentName(rng);
+    const territoryNames = pickScientistNames(rng, map.numTerritories);
+
+    const nationNames = shuffle(rng, NATION_NAMES).slice(0, 4);
+    const players = [];
+    players.push({ id: 0, name: humanName || 'Your Nation', isHuman: true, colorKey: 'human', gold: 15, tech: { fortification: 0, siege: 0, naval: 0, logistics: 0, movement: 0 }, alive: true, _harvestBonus: 0, _freeMovesUsed: 0, capitalId: null });
+    // Two of the four AI nations get a fixed, distinct personality so their
+    // play style is recognizably different game to game - one reckless
+    // (attacks readily, even at a slight disadvantage, and keeps swinging),
+    // one risk-averse (only attacks when clearly favorable, and less often).
+    // The other two keep the previous randomized "balanced" range.
+    const AI_PERSONALITIES = [
+      { name: 'reckless', aggression: 0.95, attacksPerTurn: 5 },
+      { name: 'cautious', aggression: 0.08, attacksPerTurn: 2 }
+    ];
+    for (let i = 0; i < 4; i++) {
+      const preset = AI_PERSONALITIES[i];
+      const aggression = preset ? preset.aggression : 0.4 + rng() * 0.4;
+      const attacksPerTurn = preset ? preset.attacksPerTurn : 3;
+      players.push({
+        id: i + 1, name: nationNames[i] || ('Nation ' + (i + 1)), isHuman: false, colorKey: 'ai' + (i + 1), gold: 15,
+        tech: { fortification: 0, siege: 0, naval: 0, logistics: 0, movement: 0 }, alive: true,
+        aggression, attacksPerTurn, personality: preset ? preset.name : 'balanced',
+        _harvestBonus: 0, _freeMovesUsed: 0, capitalId: null
+      });
+    }
+
+    const territories = [];
+    for (let t = 0; t < map.numTerritories; t++) {
+      const centroid = map.centroids[t];
+      const latNorm = Math.abs(centroid.y / rows - 0.5) * 2;
+      territories.push({
+        id: t, name: territoryNames[t], continent: map.territorySeeds[t].continent,
+        neighbors: [...map.adjacency[t]], navalNeighbors: [...map.navalNeighbors[t]],
+        isCoastal: !!map.isCoastal[t], cellCount: map.cellCount[t], centroid,
+        terrain: pickTerrainByLatitude(rng, latNorm),
+        owner: 'neutral', armies: 1
+      });
+    }
+
+    // Every nation starts with exactly 5 territories.
+    const bigContinentIds = new Set(map.continents.filter(c => c.territoryIds.length >= 5).map(c => c.id));
+    const eligibleIds = territories.filter(t => bigContinentIds.has(t.continent)).map(t => t.id);
+    const { owner: claimOwner } = buildStartingClaims(rng, territories, 5, 5, eligibleIds);
+    for (let t = 0; t < territories.length; t++) {
+      if (claimOwner[t] !== -1) {
+        territories[t].owner = players[claimOwner[t]].id;
+        territories[t].armies = 2 + Math.floor(rng() * 3);
+      } else {
+        territories[t].owner = 'neutral';
+        territories[t].armies = 1 + Math.floor(rng() * 2);
+      }
+    }
+
+    // The army cap is a hard rule from turn one — trim any nation whose
+    // randomly-rolled starting garrisons landed above their own cap.
+    for (const player of players) {
+      const owned = territories.filter(t => t.owner === player.id);
+      if (!owned.length) continue;
+      let cap = ARMY_CAP_BASE;
+      for (const t of owned) cap += TERRAIN_DEFS[t.terrain].armyCap;
+      cap = Math.round(cap);
+      let total = owned.reduce((s, t) => s + t.armies, 0);
+      while (total > cap) {
+        const candidates = owned.filter(t => t.armies > 1);
+        if (!candidates.length) break;
+        candidates.sort((a, b) => b.armies - a.armies);
+        candidates[0].armies--;
+        total--;
+      }
+    }
+
+    const continents = {};
+    for (const c of map.continents) continents[c.id] = { id: c.id, name: continentNames[c.id], territoryIds: c.territoryIds };
+    const coastalTerritoryIds = territories.filter(t => t.isCoastal).map(t => t.id);
+
+    const state = {
+      seed, map, territories, continents, players, coastalTerritoryIds,
+      turn: 1, round: 1, phase: 'player',
+      reinforcementPool: 0,
+      everKnown: new Map(), visibleNow: new Set(),
+      log: [], gameOver: null, rng,
+      godMode: !!godMode,
+      hardMode: !!hardMode,
+      _pirateActive: false
+    };
+    recomputeVisibility(state);
+    state.reinforcementPool = capReinforcement(state, 0, computeReinforcement(countTerritories(state, 0), fullyOwnedContinents(state, 0), players[0].tech));
+    logMsg(state, `${players[0].name} takes the field. ${map.numTerritories} territories across ${map.continents.length} continents.`);
+    return state;
+  }
+
+  // ---------------- Reinforcement ----------------
+  function threatScore(state, t, nationId) {
+    let maxEnemy = 0;
+    for (const nb of [...t.neighbors, ...t.navalNeighbors]) {
+      const nt = state.territories[nb];
+      if (nt.owner !== nationId) maxEnemy = Math.max(maxEnemy, nt.armies);
+    }
+    return maxEnemy - t.armies;
+  }
+  function autoDistribute(state, nationId, pool) {
+    const owned = state.territories.filter(t => t.owner === nationId);
+    if (!owned.length || pool <= 0) return;
+    for (let i = 0; i < pool; i++) {
+      let best = owned[0], bestScore = -Infinity;
+      for (const t of owned) {
+        const s = threatScore(state, t, nationId);
+        if (s > bestScore) { bestScore = s; best = t; }
+      }
+      best.armies++;
+    }
+  }
+  function placeReinforcement(state, territoryId) {
+    const t = state.territories[territoryId];
+    if (!t || t.owner !== 0 || state.reinforcementPool <= 0 || state.gameOver) return false;
+    t.armies++; state.reinforcementPool--;
+    return true;
+  }
+  function autoDistributeHuman(state) {
+    autoDistribute(state, 0, state.reinforcementPool);
+    state.reinforcementPool = 0;
+  }
+
+  // ---------------- Combat ----------------
+  // 'land' = adjacent territory; 'lane' = a predefined nearest-coast naval
+  // route; 'openSea' = long-range invasion between ANY two coastal
+  // territories, unlocked at max Naval Doctrine and heavily penalized so
+  // it's a real option but rarely the efficient one.
+  const OPEN_SEA_NAVAL_TECH = 3;
+  function getAttackKind(state, source, target) {
+    if (source.neighbors.includes(target.id)) return 'land';
+    if (source.navalNeighbors.includes(target.id)) return 'lane';
+    if (source.isCoastal && target.isCoastal && target.terrain === 'plains' && typeof source.owner === 'number') {
+      const tech = getPlayer(state, source.owner).tech;
+      if ((tech.naval || 0) >= OPEN_SEA_NAVAL_TECH) return 'openSea';
+    }
+    return null;
+  }
+  function navalPenaltyFor(kind, navalTechLevel) {
+    if (kind === 'land') return 1;
+    if (kind === 'lane') return 0.7 + navalTechLevel * 0.1;
+    if (kind === 'openSea') return 0.35 + navalTechLevel * 0.02;
+    return 1;
+  }
+  function isValidAttackTarget(state, sourceId, targetId) {
+    const source = state.territories[sourceId], target = state.territories[targetId];
+    if (!source || !target || source.owner === target.owner || source.armies <= 1) return false;
+    const kind = getAttackKind(state, source, target);
+    if (!kind) return false;
+    if (kind === 'lane' && state._pirateActive) return false;
+    return true;
+  }
+  function executeAttack(state, sourceId, targetId) {
+    const source = state.territories[sourceId], target = state.territories[targetId];
+    const attackerNation = source.owner, defenderNation = target.owner;
+    const attackerPlayer = getPlayer(state, attackerNation);
+    const defenderTech = typeof defenderNation === 'number' ? getPlayer(state, defenderNation).tech : {};
+    const terrainBonus = TERRAIN_DEFS[target.terrain].bonus;
+    const kind = getAttackKind(state, source, target);
+    const navalPenalty = navalPenaltyFor(kind, attackerPlayer.tech.naval || 0);
+    // The engagement's width is capped by whichever side is more
+    // restrictive: the source territory's own size (how many can launch
+    // from there) and the target's terrain (a mountain or forest pass
+    // only lets so many attackers through no matter how big the attacking
+    // army is elsewhere) - this is what makes a well-defended mountain
+    // genuinely hard to dislodge. Any extra armies beyond the cap stay
+    // home untouched, on top of the 1 that always stays to hold the
+    // territory.
+    const available = source.armies - 1;
+    const sourceWidth = maxCommittableArmies(source.cellCount, source.terrain);
+    const targetWidth = maxCommittableArmies(target.cellCount, target.terrain);
+    const maxWidth = Math.min(sourceWidth, targetWidth);
+    const committed = Math.min(available, maxWidth);
+    const uncommitted = available - committed;
+    const defenderArmiesBefore = target.armies;
+    const result = resolveCombat(state.rng, committed, target.armies,
+      attackMultiplier(attackerPlayer.tech), defenseMultiplier(defenderTech, terrainBonus), navalPenalty);
+
+    // Clear, numbers-first battle report: how many armies fought on each
+    // side (the "width" of the battle) and exactly what happened to the
+    // attacking force - only the armies that fought either advance into
+    // the conquered territory or fall back to the one that stayed put.
+    const cappedBy = targetWidth < sourceWidth ? `${target.name}'s ${target.terrain}` : `${source.name}'s size`;
+    const widthNote = uncommitted > 0 ? ` (${cappedBy} caps the attack at ${maxWidth}; ${uncommitted} stayed home)` : '';
+    if (result.attackerWins) {
+      const wasCapital = typeof defenderNation === 'number' && getPlayer(state, defenderNation).capitalId === targetId;
+      target.owner = attackerNation;
+      target.armies = result.movedIn;
+      source.armies = 1 + uncommitted + result.attackerArmiesAfter;
+      logMsg(state, `${attackerPlayer.name} attacks ${target.name} with ${committed} armies against ${defenderArmiesBefore} defenders${kind === 'openSea' ? ' (open-sea invasion)' : ''}${widthNote} — VICTORY. ${result.movedIn} advance into ${target.name}, ${source.armies} total remain in ${source.name}. ${target.name} taken from ${targetOwnerName(state, defenderNation)}.`);
+      if (wasCapital) annexDefeatedNation(state, defenderNation, attackerNation);
+    } else {
+      source.armies = 1 + uncommitted + result.attackerArmiesAfter;
+      target.armies = result.defenderArmiesAfter;
+      logMsg(state, `${attackerPlayer.name} attacks ${target.name} with ${committed} armies against ${defenderArmiesBefore} defenders${widthNote} — REPELLED${terrainBonus > 0 ? ` (${TERRAIN_DEFS[target.terrain].label} aids the defense)` : ''}. ${source.armies} total remain in ${source.name}.`);
+    }
+    checkEliminations(state);
+    recomputeVisibility(state);
+    return result;
+  }
+  function targetOwnerName(state, owner) {
+    return owner === 'neutral' ? 'the neutral garrison' : getPlayer(state, owner).name;
+  }
+
+  // ---------------- Fortify / move ----------------
+  // Move relocates roughly 60% of the armies beyond the 1 that must always
+  // stay behind to hold the source (rounded, minimum 1) - exposed as its
+  // own function so the UI can preview the exact number before you commit,
+  // not just report it afterward.
+  function computeMoveAmount(sourceArmies) {
+    return Math.max(1, Math.round((sourceArmies - 1) * 0.6));
+  }
+  const FREE_MOVES_BASE = 2;
+  // Movement tech now boosts free moves too, not just the paid cost: each
+  // level adds 2 more free moves per turn (2 -> 4 -> 6 -> 8), stacking with
+  // the existing gold-cost reduction rather than replacing it.
+  function freeMovesForPlayer(player) {
+    return FREE_MOVES_BASE + (player.tech.movement || 0) * 2;
+  }
+  function executeFortify(state, sourceId, targetId) {
+    const source = state.territories[sourceId], target = state.territories[targetId];
+    if (!source || !target || source.owner !== target.owner || source.armies <= 1) return { success: false, reason: 'invalid' };
+    // Move now allows the same reach as a normal attack (land border or
+    // naval lane) - previously it only allowed land borders, so armies
+    // could never be repositioned between two islands (or an island and
+    // the mainland) even though attacking across that exact same lane was
+    // already possible. The special long-range "open sea" reach stays
+    // attack-only, since that's meant to be a rare, costly military option,
+    // not a routine logistics route.
+    if (!source.neighbors.includes(targetId) && !source.navalNeighbors.includes(targetId)) return { success: false, reason: 'invalid' };
+    const player = getPlayer(state, source.owner);
+    const freeMovesPerTurn = freeMovesForPlayer(player);
+    const isFree = (player._freeMovesUsed || 0) < freeMovesPerTurn;
+    const cost = isFree ? 0 : moveCostFor(player.tech);
+    if (player.gold < cost) return { success: false, reason: 'gold' };
+    if (isFree) player._freeMovesUsed = (player._freeMovesUsed || 0) + 1;
+    else player.gold -= cost;
+    const moving = computeMoveAmount(source.armies);
+    source.armies -= moving;
+    target.armies += moving;
+    logMsg(state, isFree
+      ? `${player.name} moves ${moving} armies from ${source.name} to ${target.name} (free move ${player._freeMovesUsed}/${freeMovesPerTurn} this turn).`
+      : `${player.name} pays ${cost}g to move ${moving} armies from ${source.name} to ${target.name}.`);
+    return { success: true, moving, cost, free: isFree };
+  }
+
+  function buyArmy(state, nationId, territoryId) {
+    const t = state.territories[territoryId];
+    if (!t || t.owner !== nationId) return { success: false, reason: 'invalid' };
+    const player = getPlayer(state, nationId);
+    if (player.gold < ARMY_PURCHASE_COST) return { success: false, reason: 'gold' };
+    const cap = computeArmyCap(state, nationId);
+    if (nationStrength(state, nationId) >= cap) return { success: false, reason: 'cap' };
+    player.gold -= ARMY_PURCHASE_COST;
+    t.armies++;
+    logMsg(state, `${player.name} pays ${ARMY_PURCHASE_COST}g to raise a new army in ${t.name}.`);
+    return { success: true };
+  }
+
+  // Human-facing version: adds the purchased army to the reinforcement pool
+  // instead of placing it directly, so buying doesn't require picking a
+  // territory up front - you place it like any other reinforcement.
+  function buyArmyToPool(state, nationId) {
+    const player = getPlayer(state, nationId);
+    if (player.gold < ARMY_PURCHASE_COST) return { success: false, reason: 'gold' };
+    const cap = computeArmyCap(state, nationId);
+    const pending = nationId === 0 ? state.reinforcementPool : 0;
+    if (nationStrength(state, nationId) + pending >= cap) return { success: false, reason: 'cap' };
+    player.gold -= ARMY_PURCHASE_COST;
+    if (nationId === 0) state.reinforcementPool++;
+    logMsg(state, `${player.name} pays ${ARMY_PURCHASE_COST}g to raise a new army for reinforcement.`);
+    return { success: true };
+  }
+
+  // ---------------- Tech ----------------
+  function buyTech(state, nationId, key) {
+    const p = getPlayer(state, nationId);
+    const lvl = p.tech[key] || 0;
+    if (lvl >= TECH_DEFS[key].maxLevel) return false;
+    const cost = techCost(key, lvl);
+    if (p.gold < cost) return false;
+    p.gold -= cost; p.tech[key] = lvl + 1;
+    logMsg(state, `${p.name} advances ${TECH_DEFS[key].name} to level ${lvl + 1}.`);
+    return true;
+  }
+
+  // ---------------- AI ----------------
+  function evaluateAttackOptions(state, nationId) {
+    const player = getPlayer(state, nationId);
+    const openSeaUnlocked = (player.tech.naval || 0) >= OPEN_SEA_NAVAL_TECH;
+    const options = [];
+    for (const t of state.territories) {
+      if (t.owner !== nationId || t.armies <= 1) continue;
+      let candidates = [...t.neighbors.map(id => ({ id, naval: false })), ...t.navalNeighbors.filter(id => !t.neighbors.includes(id)).map(id => ({ id, naval: true }))];
+      if (openSeaUnlocked && t.isCoastal) {
+        const already = new Set(candidates.map(c => c.id));
+        for (const id of state.coastalTerritoryIds) {
+          if (id === t.id || already.has(id)) continue;
+          candidates.push({ id, naval: true });
+        }
+      }
+      for (const { id, naval } of candidates) {
+        const target = state.territories[id];
+        if (target.owner === nationId) continue;
+        const kind = getAttackKind(state, t, target);
+        if (!kind) continue;
+        if (kind === 'lane' && state._pirateActive) continue;
+        const atkMult = attackMultiplier(player.tech);
+        const terrainBonus = TERRAIN_DEFS[target.terrain].bonus;
+        const defMult = typeof target.owner === 'number' ? defenseMultiplier(getPlayer(state, target.owner).tech, terrainBonus) : (1 + terrainBonus);
+        const navalPenalty = navalPenaltyFor(kind, player.tech.naval || 0);
+        const maxWidth = Math.min(maxCommittableArmies(t.cellCount, t.terrain), maxCommittableArmies(target.cellCount, target.terrain));
+        const committed = Math.min(t.armies - 1, maxWidth);
+        const estAttack = committed * atkMult * navalPenalty;
+        const estDefense = target.armies * defMult;
+        const ratio = estAttack / Math.max(0.01, estDefense);
+        options.push({ sourceId: t.id, targetId: id, ratio, naval });
+      }
+    }
+    options.sort((a, b) => b.ratio - a.ratio);
+    return options;
+  }
+
+  function runAiTurn(state, nationId) {
+    const player = getPlayer(state, nationId);
+    if (!player.alive) return;
+
+    const rawPool = computeReinforcement(countTerritories(state, nationId), fullyOwnedContinents(state, nationId), player.tech) + (player._harvestBonus || 0) + capitalReinforcementBonus(state, nationId);
+    // Math.round would often round a 15% bump on a small pool straight back
+    // down to nothing (e.g. round(3*1.15)=3) - ceil guarantees the bonus is
+    // always actually felt, not just theoretical early on.
+    const pool = capReinforcement(state, nationId, state.hardMode ? Math.ceil(rawPool * 1.15) : rawPool);
+    player._harvestBonus = 0;
+    autoDistribute(state, nationId, pool);
+
+    let attacksLeft = player.attacksPerTurn || 3;
+    while (attacksLeft > 0 && player.alive) {
+      const options = evaluateAttackOptions(state, nationId).filter(o => o.ratio > 1.3 * (1 - player.aggression * 0.3));
+      if (!options.length) break;
+      const best = options[0];
+      executeAttack(state, best.sourceId, best.targetId);
+      attacksLeft--;
+      if (state.gameOver) return;
+    }
+
+    // Economic phase: research tech first (permanent power, now a real
+    // investment at 100g/level), then spend whatever gold is left over on
+    // armies (10g each, respecting the cap) rather than letting it sit idle.
+    // Personality shapes priority, not just threshold: cautious nations
+    // reach for Fortification first, reckless ones for Siege - so a
+    // defensive AI actually turtles up, and an aggressive one actually
+    // hits harder, not just attacks more often.
+    let boughtSomething = true;
+    while (boughtSomething) {
+      boughtSomething = false;
+      const rest = shuffle(state.rng, Object.keys(TECH_DEFS).filter(k => k !== 'fortification' && k !== 'siege'));
+      let keys;
+      if (player.personality === 'cautious') keys = ['fortification', ...rest, 'siege'];
+      else if (player.personality === 'reckless') keys = ['siege', ...rest, 'fortification'];
+      else keys = shuffle(state.rng, Object.keys(TECH_DEFS));
+      for (const k of keys) {
+        const lvl = player.tech[k] || 0;
+        if (lvl >= TECH_DEFS[k].maxLevel) continue;
+        const cost = techCost(k, lvl);
+        if (player.gold >= cost) { buyTech(state, nationId, k); boughtSomething = true; break; }
+      }
+    }
+    const ownedTerritories = state.territories.filter(t => t.owner === nationId);
+    while (ownedTerritories.length && player.gold >= ARMY_PURCHASE_COST && nationStrength(state, nationId) < computeArmyCap(state, nationId)) {
+      const target = ownedTerritories[Math.floor(state.rng() * ownedTerritories.length)];
+      if (!buyArmy(state, nationId, target.id).success) break;
+    }
+    checkEliminations(state);
+  }
+
+  // ---------------- Round / turn flow ----------------
+  const EVENTS = [
+    { name: 'Gold Rush', apply(state, rng) { const alive = state.players.filter(p => p.alive); if (!alive.length) return; const p = choice(rng, alive); p.gold += 8; logMsg(state, `${p.name} strikes a gold rush (+8 gold).`); } },
+    { name: 'Rebellion', apply(state, rng) { const owned = state.territories.filter(t => typeof t.owner === 'number'); if (!owned.length) return; const t = choice(rng, owned); const loss = Math.max(1, Math.floor(t.armies * 0.3)); t.armies = Math.max(1, t.armies - loss); logMsg(state, `Unrest in ${t.name} weakens its garrison by ${loss}.`); } },
+    { name: 'Bountiful Harvest', apply(state, rng) { const alive = state.players.filter(p => p.alive); if (!alive.length) return; const p = choice(rng, alive); p._harvestBonus = (p._harvestBonus || 0) + 2; logMsg(state, `${p.name} reports a bountiful harvest (+2 reinforcements next turn).`); } },
+    { name: 'Plague', apply(state, rng) { const owned = state.territories.filter(t => typeof t.owner === 'number' && t.armies > 2); if (!owned.length) return; const t = choice(rng, owned); const loss = Math.max(1, Math.floor(t.armies * 0.25)); t.armies -= loss; logMsg(state, `Plague strikes ${t.name} (-${loss} armies).`); } },
+    { name: 'Pirate Raid', apply(state, rng) { state._pirateActive = true; logMsg(state, `Pirates raid the sea lanes — naval movement is disrupted this round.`); } }
+  ];
+  function triggerRandomEvent(state) {
+    if (state.rng() < 0.22) { const ev = choice(state.rng, EVENTS); ev.apply(state, state.rng); }
+  }
+  function growNeutrals(state) {
+    for (const t of state.territories) {
+      if (t.owner === 'neutral' && t.armies < 3 && state.rng() < 0.15) t.armies++;
+    }
+  }
+
+  function endPlayerTurn(state) {
+    if (state.gameOver) return;
+    if (state.reinforcementPool > 0) autoDistributeHuman(state);
+    state.phase = 'ai';
+
+    for (let i = 1; i <= 4; i++) {
+      if (state.gameOver) break;
+      runAiTurn(state, i);
+    }
+    checkWinCondition(state);
+    if (state.gameOver) { state.phase = 'gameover'; return; }
+
+    state._pirateActive = false;
+    growNeutrals(state);
+    // Random events disabled for now (triggerRandomEvent/EVENTS still defined
+    // below, just not called - easy to re-enable later).
+    state.round++;
+    for (const p of state.players) p._freeMovesUsed = 0;
+    if (state.round === CAPITAL_SELECTION_ROUND) triggerCapitalSelection(state);
+
+    for (const p of state.players) if (p.alive) p.gold += computeGoldIncome(countTerritories(state, p.id), fullyOwnedContinents(state, p.id)) + capitalGoldBonus(state, p.id);
+
+    state.turn++;
+    const human = getPlayer(state, 0);
+    state.reinforcementPool = human.alive ? capReinforcement(state, 0, computeReinforcement(countTerritories(state, 0), fullyOwnedContinents(state, 0), human.tech) + (human._harvestBonus || 0) + capitalReinforcementBonus(state, 0)) : 0;
+    human._harvestBonus = 0;
+    state.phase = 'player';
+    recomputeVisibility(state);
+  }
+
+  function autoPlayHumanTurn(state) {
+    if (state.gameOver) return;
+    if (state.needsCapitalChoice) {
+      const cid = chooseCapitalHeuristic(state, 0);
+      if (cid != null) setCapital(state, 0, cid);
+      state.needsCapitalChoice = false;
+    }
+    if (state.reinforcementPool > 0) autoDistributeHuman(state);
+    let attacksLeft = 3;
+    while (attacksLeft > 0) {
+      const options = evaluateAttackOptions(state, 0).filter(o => o.ratio > 1.3);
+      if (!options.length) break;
+      const best = options[0];
+      executeAttack(state, best.sourceId, best.targetId);
+      attacksLeft--;
+      if (state.gameOver) return;
+    }
+    const human = getPlayer(state, 0);
+    let boughtSomething = true;
+    while (boughtSomething) {
+      boughtSomething = false;
+      for (const k of Object.keys(TECH_DEFS)) {
+        const lvl = human.tech[k] || 0;
+        if (lvl >= TECH_DEFS[k].maxLevel) continue;
+        const cost = techCost(k, lvl);
+        if (human.gold >= cost) { buyTech(state, 0, k); boughtSomething = true; break; }
+      }
+    }
+    const ownedTerritories = state.territories.filter(t => t.owner === 0);
+    while (ownedTerritories.length && human.gold >= ARMY_PURCHASE_COST && nationStrength(state, 0) < computeArmyCap(state, 0)) {
+      const target = ownedTerritories[Math.floor(state.rng() * ownedTerritories.length)];
+      if (!buyArmy(state, 0, target.id).success) break;
+    }
+    endPlayerTurn(state);
+  }
+
+  const api = {
+    createInitialState, getPlayer, logMsg, countTerritories, fullyOwnedContinents,
+    nationStrength, computeArmyCap, recomputeVisibility, checkEliminations,
+    scoreOf, checkWinCondition, placeReinforcement, autoDistributeHuman, isValidAttackTarget,
+    executeAttack, executeFortify, computeMoveAmount, freeMovesForPlayer, buyTech, buyArmy, buyArmyToPool,
+    setCapital, hasCapital, CAPITAL_SELECTION_ROUND, CAPITAL_GOLD_BONUS, CAPITAL_REINFORCEMENT_BONUS,
+    evaluateAttackOptions, runAiTurn, endPlayerTurn, autoPlayHumanTurn, triggerRandomEvent, growNeutrals, EVENTS
+  };
+
+  if (typeof module !== 'undefined') module.exports = api;
+  else Object.assign(root, api);
+})(typeof window !== 'undefined' ? window : globalThis);
+
+// ============================================================
+// DOM / RENDERING / INTERACTION LAYER (browser only)
+// Depends on globals from core.js and game-logic.js.
+// ============================================================
+(function () {
+  'use strict';
+
+  const COLORS = {
+    human: [44, 140, 124],
+    ai1: [166, 52, 43],
+    ai2: [62, 76, 130],
+    ai3: [63, 107, 58],
+    ai4: [110, 59, 99],
+    neutral: [130, 122, 106],
+    sea: [28, 78, 132],
+    seaDeep: [18, 56, 102],
+    fog: [37, 40, 33],
+    borderInk: [16, 16, 12],
+    borderSource: [230, 178, 63],
+    borderTarget: [214, 92, 63],
+    borderFortify: [110, 190, 170]
+  };
+  const NATION_KEYS = ['human', 'ai1', 'ai2', 'ai3', 'ai4'];
+
+  const TERRAIN_COLORS = {
+    plains: [158, 206, 130],
+    mountains: [150, 150, 160],
+    desert: [214, 189, 116],
+    forest: [64, 98, 58],
+    ice: [214, 224, 228]
+  };
+
+  let state = null;
+  let uiMode = null; // 'reinforce' | 'attack' | 'fortify' | null
+  let actionSourceId = null;
+  let infoSelectedId = null;
+  let activeTab = 'territory';
+  let mapViewMode = 'political'; // 'political' | 'terrain'
+  let zoomLevel = 1;
+  const ZOOM_MIN = 1, ZOOM_MAX = 3.5, ZOOM_STEP = 0.5;
+
+  let canvas, ctx, offCanvas, offCtx;
+
+  function ownerColorKey(owner) {
+    if (owner === 'neutral') return 'neutral';
+    return state.players[owner].colorKey;
+  }
+  function rgb(a) { return `rgb(${a[0]},${a[1]},${a[2]})`; }
+  function dim(a, f) { return [Math.round(a[0] * f), Math.round(a[1] * f), Math.round(a[2] * f)]; }
+  function blend(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function lighten(a, amt) { return [a[0] + (255 - a[0]) * amt, a[1] + (255 - a[1]) * amt, a[2] + (255 - a[2]) * amt]; }
+
+  function isVisibleTerritory(tId) { return state.visibleNow.has(tId); }
+  function isKnownTerritory(tId) { return state.everKnown.has(tId); }
+
+  function computeValidTargets() {
+    const set = new Set();
+    if (actionSourceId == null) return set;
+    const src = state.territories[actionSourceId];
+    if (uiMode === 'attack') {
+      for (const nb of [...src.neighbors, ...src.navalNeighbors]) {
+        if (isValidAttackTarget(state, actionSourceId, nb)) set.add(nb);
+      }
+    } else if (uiMode === 'fortify') {
+      for (const nb of [...src.neighbors, ...src.navalNeighbors]) {
+        if (state.territories[nb].owner === src.owner) set.add(nb);
+      }
+    }
+    return set;
+  }
+
+  function buildImageData() {
+    const cols = state.map.cols, rows = state.map.rows;
+    const img = ctx.createImageData ? offCtx.createImageData(cols, rows) : null;
+    const data = img.data;
+    const cellTerritory = state.map.cellTerritory;
+    const isSea = state.map.isSea;
+    const validTargets = computeValidTargets();
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const idx = y * cols + x;
+        let color;
+        if (isSea[idx]) {
+          color = ((x + y) % 7 === 0) ? COLORS.seaDeep : COLORS.sea;
+        } else {
+          const tId = cellTerritory[idx];
+          const t = state.territories[tId];
+          const known = isKnownTerritory(tId);
+          if (!known) {
+            color = COLORS.fog;
+          } else {
+            const ownerKey = ownerColorKey(t.owner);
+            let base = mapViewMode === 'terrain' ? TERRAIN_COLORS[t.terrain] : COLORS[ownerKey];
+            if (!isVisibleTerritory(tId)) base = blend(dim(base, 0.55), COLORS.fog, 0.25);
+
+            // Coastline (against sea or the map edge): checked in all 4
+            // cardinal directions - sea is never itself inked, so there's
+            // no double-thickness risk, just a complete outline.
+            //
+            // Territory-vs-territory borders: checked in all 8 directions
+            // (needed to catch two territories that only touch at a
+            // corner - a 4-direction-only check leaves those completely
+            // disconnected, shattering the line into isolated dots), but
+            // only inked on the side whose territory index is numerically
+            // smaller. That single consistent tie-break means each
+            // boundary is inked from exactly one side (1 cell thick)
+            // while 8-direction coverage keeps it fully continuous
+            // through corner-only touches and any diagonal trend.
+            let isForeignBorder = false, isSameOwnerBorder = false;
+            const coastDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+            for (const [dx, dy] of coastDirs) {
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) { isForeignBorder = true; continue; }
+              if (isSea[ny * cols + nx]) { isForeignBorder = true; continue; }
+            }
+            const territoryDirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+            for (const [dx, dy] of territoryDirs) {
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+              const nIdx = ny * cols + nx;
+              if (isSea[nIdx]) continue;
+              const nt = cellTerritory[nIdx];
+              if (nt !== tId && tId < nt) {
+                const otherOwner = state.territories[nt].owner;
+                if (typeof t.owner === 'number' && otherOwner === t.owner) isSameOwnerBorder = true;
+                else isForeignBorder = true;
+              }
+            }
+            if (isForeignBorder) {
+              if (tId === actionSourceId) color = COLORS.borderSource;
+              else if (validTargets.has(tId)) color = (uiMode === 'fortify' ? COLORS.borderFortify : COLORS.borderTarget);
+              else color = COLORS.borderInk;
+            } else if (isSameOwnerBorder) {
+              if (tId === actionSourceId) color = COLORS.borderSource;
+              else if (validTargets.has(tId)) color = (uiMode === 'fortify' ? COLORS.borderFortify : COLORS.borderTarget);
+              else color = lighten(COLORS[ownerKey], 0.4);
+            } else {
+              color = base;
+            }
+          }
+        }
+        const p = idx * 4;
+        data[p] = color[0]; data[p + 1] = color[1]; data[p + 2] = color[2]; data[p + 3] = 255;
+      }
+    }
+    return img;
+  }
+
+  function render() {
+    if (!state) return;
+    const cols = state.map.cols, rows = state.map.rows;
+    offCanvas.width = cols; offCanvas.height = rows;
+    const img = buildImageData();
+    offCtx.putImageData(img, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(offCanvas, 0, 0, cols, rows, 0, 0, canvas.width, canvas.height);
+
+    // Strait routes: draw the naval lanes as visible dashed lines across the
+    // ocean, so it's clear at a glance which coasts can reach each other —
+    // brighter and thicker when it's a currently-attackable option.
+    const sxL = canvas.width / cols, syL = canvas.height / rows;
+    const validTargetsForStraits = computeValidTargets();
+    ctx.setLineDash([5, 5]);
+    for (const [a, b] of state.map.navalLanes) {
+      if (!isKnownTerritory(a) || !isKnownTerritory(b)) continue;
+      const ta = state.territories[a], tb = state.territories[b];
+      const isActionable = uiMode === 'attack' && actionSourceId != null &&
+        ((actionSourceId === a && validTargetsForStraits.has(b)) || (actionSourceId === b && validTargetsForStraits.has(a)));
+      ctx.strokeStyle = isActionable ? 'rgba(230,178,63,0.85)' : 'rgba(200,220,240,0.28)';
+      ctx.lineWidth = isActionable ? 2.5 : 1.2;
+      ctx.beginPath();
+      ctx.moveTo(ta.centroid.x * sxL, ta.centroid.y * syL);
+      ctx.lineTo(tb.centroid.x * sxL, tb.centroid.y * syL);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // labels
+    const sx = canvas.width / cols, sy = canvas.height / rows;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const TERRAIN_LETTER = { mountains: 'M', forest: 'F', desert: 'D', ice: 'I', plains: '' };
+    const TERRAIN_BADGE_COLOR = { mountains: 'rgba(233,227,211,0.9)', forest: 'rgba(150,255,180,0.85)', desert: 'rgba(255,214,140,0.85)', ice: 'rgba(180,220,255,0.9)', plains: '' };
+    const capitalIds = new Set();
+    for (const p of state.players) if (p.capitalId != null) capitalIds.add(p.capitalId);
+    for (const t of state.territories) {
+      if (!isKnownTerritory(t.id)) continue;
+      const cx = t.centroid.x * sx, cy = t.centroid.y * sy;
+      const visible = isVisibleTerritory(t.id);
+      const armies = visible ? t.armies : (state.everKnown.get(t.id).armies);
+      const letter = TERRAIN_LETTER[t.terrain];
+
+      // In terrain view, the fill color shows terrain rather than owner, so
+      // draw a small owner-color pin — guaranteed visible even for a lone
+      // territory with no same-owner neighbor to pick up the border tint.
+      if (mapViewMode === 'terrain' && visible) {
+        const ownerKey = ownerColorKey(t.owner);
+        ctx.fillStyle = rgb(COLORS[ownerKey]);
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+        ctx.lineWidth = 1.5;
+        const pinR = Math.max(3, Math.min(6, sx * 0.28));
+        ctx.beginPath();
+        ctx.arc(cx, cy - (letter ? 18 : 11), pinR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.font = '600 13px "Barlow Condensed", sans-serif';
+      ctx.fillStyle = visible ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.lineWidth = 2.5;
+      const armyY = letter ? cy + 7 : cy;
+      ctx.strokeText(String(armies), cx, armyY);
+      ctx.fillText(String(armies), cx, armyY);
+
+      if (letter && visible) {
+        ctx.font = '700 11px "Barlow Condensed", sans-serif';
+        ctx.fillStyle = TERRAIN_BADGE_COLOR[t.terrain];
+        ctx.strokeText(letter, cx, cy - 7);
+        ctx.fillText(letter, cx, cy - 7);
+      }
+
+      if (visible && capitalIds.has(t.id)) {
+        ctx.font = '700 13px "Barlow Condensed", sans-serif';
+        ctx.fillStyle = '#e6b23f';
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+        ctx.lineWidth = 2;
+        const starY = cy - (letter ? 30 : 18);
+        ctx.strokeText('★', cx, starY);
+        ctx.fillText('★', cx, starY);
+      }
+    }
+
+    updateTopbar();
+    updateLegend();
+    updateTerritoryPanel();
+    updateTechPanel();
+    updateLogPanel();
+
+    if (state.gameOver) showGameOver();
+  }
+
+  // ---------------- Interaction ----------------
+  function screenToTerritory(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    const x = (clientX - rect.left) / rect.width;
+    const y = (clientY - rect.top) / rect.height;
+    const cols = state.map.cols, rows = state.map.rows;
+    const gx = Math.min(cols - 1, Math.max(0, Math.floor(x * cols)));
+    const gy = Math.min(rows - 1, Math.max(0, Math.floor(y * rows)));
+    const idx = gy * cols + gx;
+    if (state.map.isSea[idx]) return null;
+    return state.map.cellTerritory[idx];
+  }
+
+  function onCanvasClick(evt) {
+    if (!state || state.gameOver) return;
+    const tId = screenToTerritory(evt);
+    if (tId == null) return;
+    handleTerritoryClick(tId);
+  }
+
+  function attackWidthHint(t) {
+    const available = t.armies - 1;
+    const maxWidth = maxCommittableArmies(t.cellCount, t.terrain);
+    const committed = Math.min(available, maxWidth);
+    const capped = available > maxWidth;
+    return `Attacking from ${t.name}: up to ${committed} of ${t.armies} armies will fight${capped ? ` (capped by this territory's size/terrain, max ${maxWidth})` : ''} — a mountain or forest target may cap it further. Choose a highlighted target.`;
+  }
+
+  function handleTerritoryClick(tId) {
+    infoSelectedId = tId;
+    const t = state.territories[tId];
+
+    if (state.needsCapitalChoice) {
+      if (t.owner === 0) {
+        setCapital(state, 0, tId);
+        state.needsCapitalChoice = false;
+        setHint(`${t.name} is now your capital — +${CAPITAL_GOLD_BONUS}g and +${CAPITAL_REINFORCEMENT_BONUS} reinforcement per round, but losing it ends your game immediately.`);
+      } else {
+        setHint('Choose one of your own territories to be your capital.');
+      }
+      render();
+      return;
+    }
+
+    if (uiMode === 'reinforce') {
+      if (t.owner === 0) {
+        if (placeReinforcement(state, tId)) setHint(`Placed 1 reinforcement in ${t.name}.`);
+      } else {
+        setHint('Reinforcements can only be placed on your own territories.');
+      }
+    } else if (uiMode === 'attack') {
+      if (actionSourceId == null) {
+        if (t.owner === 0 && t.armies > 1) { actionSourceId = tId; setHint(attackWidthHint(t)); }
+        else setHint('Choose one of your territories with more than 1 army to attack from.');
+      } else if (tId === actionSourceId) {
+        actionSourceId = null; setHint('Attack cancelled.');
+      } else if (t.owner === 0 && t.armies > 1) {
+        actionSourceId = tId; setHint(attackWidthHint(t));
+      } else if (isValidAttackTarget(state, actionSourceId, tId)) {
+        const src = state.territories[actionSourceId];
+        const srcName = src.name, tgtName = t.name;
+        executeAttack(state, actionSourceId, tId);
+        const stillOwned = state.territories[actionSourceId].owner === 0;
+        setHint(t.owner === 0 ? `${srcName} captured ${tgtName}! See the Log tab for the full battle report.` : `Attack from ${srcName} on ${tgtName} resolved — see the Log tab for the breakdown.`);
+        actionSourceId = (stillOwned && state.territories[actionSourceId].armies > 1) ? actionSourceId : null;
+        checkWinCondition(state);
+      } else {
+        setHint('Not a valid attack target from here.');
+      }
+    } else if (uiMode === 'fortify') {
+      const human = state.players[0];
+      const freeLeft = Math.max(0, freeMovesForPlayer(human) - (human._freeMovesUsed || 0));
+      const moveCost = freeLeft > 0 ? 0 : moveCostFor(human.tech);
+      if (actionSourceId == null) {
+        if (t.owner === 0 && t.armies > 1) {
+          if (human.gold < moveCost) setHint(`Moving costs ${moveCost}g and you only have ${human.gold}g.`);
+          else {
+            actionSourceId = tId;
+            const preview = computeMoveAmount(t.armies);
+            const costNote = moveCost === 0 ? `free (${freeLeft} of ${freeMovesForPlayer(human)} free moves left this turn)` : `costs ${moveCost}g`;
+            setHint(`Moving from ${t.name}: ${preview} of ${t.armies} armies will move (${t.armies - preview} stay to hold), ${costNote} — choose a connected territory of yours.`);
+          }
+        }
+        else setHint('Choose one of your territories with more than 1 army to move from.');
+      } else if (tId === actionSourceId) {
+        actionSourceId = null; setHint('Move cancelled.');
+      } else if (t.owner === 0 && (state.territories[actionSourceId].neighbors.includes(tId) || state.territories[actionSourceId].navalNeighbors.includes(tId))) {
+        const result = executeFortify(state, actionSourceId, tId);
+        actionSourceId = null;
+        setHint(result.success ? (result.free ? `Moved ${result.moving} armies for free.` : `Moved ${result.moving} armies for ${result.cost}g.`) : (result.reason === 'gold' ? `Not enough gold (need ${moveCost}g).` : 'Could not move there.'));
+      } else {
+        setHint('Choose an adjacent territory you own.');
+      }
+    }
+    render();
+  }
+
+  function setMode(mode) {
+    uiMode = (uiMode === mode) ? null : mode;
+    actionSourceId = null;
+    render();
+    updateHint();
+  }
+
+  function toggleViewMode() {
+    mapViewMode = (mapViewMode === 'political') ? 'terrain' : 'political';
+    const btn = document.getElementById('terrainViewBtn');
+    if (btn) btn.classList.toggle('active', mapViewMode === 'terrain');
+    render();
+  }
+
+  // ---------------- God Mode auto-play ----------------
+  let autoPlayTimer = null;
+  function stopAutoPlay() {
+    if (autoPlayTimer) { clearInterval(autoPlayTimer); autoPlayTimer = null; }
+    const btn = document.getElementById('autoPlayBtn');
+    if (btn) { btn.classList.remove('active'); btn.textContent = 'Auto-Play'; }
+  }
+  function toggleAutoPlay() {
+    if (autoPlayTimer) { stopAutoPlay(); return; }
+    const btn = document.getElementById('autoPlayBtn');
+    if (btn) { btn.classList.add('active'); btn.textContent = 'Stop Auto-Play'; }
+    autoPlayTimer = setInterval(() => {
+      if (!state || state.gameOver) { stopAutoPlay(); render(); return; }
+      uiMode = null; actionSourceId = null;
+      autoPlayHumanTurn(state);
+      render();
+      if (state.gameOver) stopAutoPlay();
+    }, 550);
+  }
+
+  function setHint(text) {
+    const el = document.getElementById('hintBar');
+    if (el) el.textContent = text;
+  }
+  function updateHint() {
+    if (state.gameOver) return;
+    const human = state.players[0];
+    if (state.needsCapitalChoice) {
+      setHint(`Choose your capital: click one of your own territories. It grants +${CAPITAL_GOLD_BONUS}g and +${CAPITAL_REINFORCEMENT_BONUS} reinforcement per round — but if you lose it, the game ends immediately, so pick somewhere defensible.`);
+      return;
+    }
+    if (!uiMode) setHint('Select a territory to inspect it, or choose an action above.');
+    else if (uiMode === 'reinforce') setHint(`Reinforcement pool: ${state.reinforcementPool}. Click your territories to place armies (free).`);
+    else if (uiMode === 'attack' && actionSourceId == null) setHint('Choose one of your territories with more than 1 army to attack from.');
+    else if (uiMode === 'fortify' && actionSourceId == null) {
+      const freeLeft = Math.max(0, freeMovesForPlayer(human) - (human._freeMovesUsed || 0));
+      setHint(freeLeft > 0
+        ? `Choose one of your territories with more than 1 army to move from (${freeLeft} of ${freeMovesForPlayer(human)} free moves left this turn).`
+        : `Choose one of your territories with more than 1 army to move from (costs ${moveCostFor(human.tech)}g, gold: ${human.gold}).`);
+    }
+  }
+
+  // ---------------- Panels ----------------
+  function techLevelDots(level, max) {
+    let s = '';
+    for (let i = 0; i < max; i++) s += `<span class="dot ${i < level ? 'filled' : ''}"></span>`;
+    return s;
+  }
+
+  function updateLegend() {
+    const el = document.getElementById('legendContainer');
+    if (!el) return;
+    let html = `<span class="item"><span class="swatch human"></span>You (${state.players[0].name})</span>`;
+    for (let i = 1; i <= 4; i++) {
+      const p = state.players[i];
+      html += `<span class="item"><span class="swatch ${p.colorKey}"></span>${p.name}${!p.alive ? ' (eliminated)' : ''}</span>`;
+    }
+    html += `<span class="item"><span class="swatch neutral"></span>Neutral garrison</span>`;
+    el.innerHTML = html;
+  }
+
+  function updateTopbar() {
+    const human = state.players[0];
+    document.getElementById('turnCounter').textContent = state.round;
+    document.getElementById('goldCounter').textContent = human.gold;
+    document.getElementById('reinforceCounter').textContent = state.reinforcementPool;
+    document.getElementById('territoryCounter').textContent = countTerritories(state, 0);
+    const armyCap = computeArmyCap(state, 0);
+    document.getElementById('armyCounter').innerHTML = `${nationStrength(state, 0)}<span class="value-sub">/${armyCap}</span>`;
+    document.getElementById('endTurnBtn').disabled = !!state.gameOver || !!autoPlayTimer || !!state.needsCapitalChoice;
+    document.getElementById('endTurnBtn').textContent = state.needsCapitalChoice ? 'Choose your capital first' : `End Turn [E] — Round ${state.round}`;
+    const freeMovesLeft = Math.max(0, freeMovesForPlayer(human) - (human._freeMovesUsed || 0));
+    document.getElementById('fortifyModeBtn').textContent = freeMovesLeft > 0 ? `Move [M] (${freeMovesLeft} free)` : `Move [M] (${moveCostFor(human.tech)}g)`;
+    document.getElementById('buyarmyModeBtn').textContent = `Buy Army [B] (${ARMY_PURCHASE_COST}g)`;
+    const badge = document.getElementById('godModeBadge');
+    if (badge) badge.style.display = state.godMode ? 'inline-flex' : 'none';
+    const hardBadge = document.getElementById('hardModeBadge');
+    if (hardBadge) hardBadge.style.display = state.hardMode ? 'inline-flex' : 'none';
+    ['reinforceModeBtn', 'attackModeBtn', 'fortifyModeBtn'].forEach(id => document.getElementById(id).classList.remove('active'));
+    if (uiMode) document.getElementById(uiMode + 'ModeBtn').classList.add('active');
+    ['reinforceModeBtn', 'attackModeBtn', 'fortifyModeBtn', 'buyarmyModeBtn'].forEach(id => document.getElementById(id).disabled = !!state.needsCapitalChoice);
+  }
+
+  function updateTerritoryPanel() {
+    const el = document.getElementById('territoryPanel');
+    if (infoSelectedId == null || !isKnownTerritory(infoSelectedId)) {
+      el.innerHTML = `<p class="muted">Click a territory on the map to inspect it.</p>`;
+      return;
+    }
+    const t = state.territories[infoSelectedId];
+    const visible = isVisibleTerritory(infoSelectedId);
+    const snap = visible ? t : state.everKnown.get(infoSelectedId);
+    const ownerName = snap.owner === 'neutral' ? 'Neutral garrison' : state.players[snap.owner].name;
+    const cont = state.continents[t.continent];
+    const terrainDef = TERRAIN_DEFS[t.terrain];
+    const bonusText = terrainDef.bonus > 0 ? `, +${Math.round(terrainDef.bonus * 100)}% defense` : '';
+    const maxWidth = maxCommittableArmies(t.cellCount, t.terrain);
+    const currentAvailable = snap.armies > 1 ? Math.min(snap.armies - 1, maxWidth) : 0;
+    let techRow = '';
+    if (typeof snap.owner === 'number') {
+      const ownerPlayer = state.players[snap.owner];
+      const ownerTech = ownerPlayer.tech;
+      const romanLevel = ['0', 'I', 'II', 'III'];
+      const parts = Object.keys(TECH_DEFS).map(k => `${TECH_DEFS[k].name.split(' ')[0]} ${romanLevel[ownerTech[k] || 0]}`);
+      const personalityNote = ownerPlayer.personality && ownerPlayer.personality !== 'balanced'
+        ? `<div class="stat-row"><span>${ownerName}'s style</span><b style="text-transform:capitalize;">${ownerPlayer.personality}</b></div>` : '';
+      techRow = personalityNote + `<div class="stat-row"><span>${ownerName}'s tech</span><b style="font-size:12px;">${parts.join(' · ')}</b></div>`;
+    }
+    const isCapital = typeof snap.owner === 'number' && state.players[snap.owner].capitalId === t.id;
+    const capitalRow = isCapital ? `<div class="stat-row"><span>Capital</span><b style="color:#e6b23f;">★ ${ownerName}'s capital</b></div>` : '';
+    el.innerHTML = `
+      <h3>${t.name}${!visible ? ' <span class="stale">(last seen)</span>' : ''}</h3>
+      <div class="stat-row"><span>Owner</span><b>${ownerName}</b></div>
+      <div class="stat-row"><span>Armies</span><b>${snap.armies}</b></div>
+      ${capitalRow}
+      <div class="stat-row"><span>Attack width</span><b>${maxWidth} max${snap.armies > 1 ? ` (${currentAvailable} now)` : ''}</b></div>
+      <div class="stat-row"><span>Continent</span><b>${cont.name}</b></div>
+      <div class="stat-row"><span>Terrain</span><b>${terrainDef.label} (+${terrainDef.armyCap} army cap${bonusText})</b></div>
+      <div class="stat-row"><span>Coastal</span><b>${t.isCoastal ? 'Yes (naval lane)' : 'No'}</b></div>
+      ${techRow}
+    `;
+  }
+
+  function updateTechPanel() {
+    const el = document.getElementById('techPanel');
+    const human = state.players[0];
+    let html = '';
+    for (const key in TECH_DEFS) {
+      const def = TECH_DEFS[key];
+      const lvl = human.tech[key] || 0;
+      const maxed = lvl >= def.maxLevel;
+      const cost = maxed ? null : techCost(key, lvl);
+      html += `<div class="tech-row">
+        <div class="tech-info"><b>${def.name}</b><span class="muted">${def.desc}</span></div>
+        <div class="tech-dots">${techLevelDots(lvl, def.maxLevel)}</div>
+        ${maxed ? `<span class="maxed">MAX</span>` : `<button data-tech="${key}" ${human.gold < cost ? 'disabled' : ''}>Buy (${cost}g)</button>`}
+      </div>`;
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-tech]').forEach(b => b.addEventListener('click', () => { buyTech(state, 0, b.dataset.tech); render(); }));
+  }
+
+  function updateLogPanel() {
+    const el = document.getElementById('logPanel');
+    const entries = state.log.slice().reverse().slice(0, 60);
+    el.innerHTML = entries.map(l => `<div class="log-row"><span class="log-round">R${l.round}</span>${l.text}</div>`).join('');
+  }
+
+  // ---------------- Turn flow ----------------
+  function endTurnClicked() {
+    if (!state || state.gameOver) return;
+    uiMode = null; actionSourceId = null;
+    endPlayerTurn(state);
+    render();
+    updateHint();
+  }
+
+  function showGameOver() {
+    const modal = document.getElementById('gameOverModal');
+    modal.classList.add('open');
+    const won = state.gameOver.reason.startsWith('victory');
+    document.getElementById('gameOverTitle').textContent = won ? 'Victory' : 'Defeat';
+    document.getElementById('gameOverTitle').className = won ? 'win' : 'lose';
+    const reasonText = {
+      'victory': 'Every rival nation has fallen. The continent is yours.',
+      'defeat': 'Your nation has been eliminated.',
+      'victory-score': 'The 100-round campaign ends — you hold the strongest position.',
+      'defeat-score': 'The 100-round campaign ends — a rival holds the strongest position.'
+    }[state.gameOver.reason];
+    document.getElementById('gameOverReason').textContent = reasonText;
+    const rows = state.players.map(p => ({ p, score: scoreOf(state, p.id) })).sort((a, b) => b.score - a.score);
+    document.getElementById('gameOverTable').innerHTML = rows.map(r => `
+      <div class="stat-row"><span><span class="swatch ${r.p.colorKey}"></span>${r.p.name}${!r.p.alive ? ' (eliminated)' : ''}</span><b>${r.score}</b></div>
+    `).join('');
+  }
+
+  function openModal(id) {
+    document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+    document.getElementById(id).classList.add('open');
+  }
+  function closeAllModals() {
+    document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+  }
+
+  // ---------------- New game ----------------
+  function startNewGame(name, godMode, hardMode) {
+    stopAutoPlay();
+    const seed = Date.now() ^ Math.floor(Math.random() * 1e9);
+    state = createInitialState({ seed, humanName: name || 'Your Nation', godMode, hardMode });
+    uiMode = null; actionSourceId = null; infoSelectedId = null; mapViewMode = 'political';
+    zoomLevel = 1;
+    const wrap0 = document.getElementById('mapWrap'); if (wrap0) { wrap0.style.height = ''; wrap0.dataset.baseW = ''; }
+    const gb = document.getElementById('terrainViewBtn'); if (gb) gb.classList.remove('active');
+    closeAllModals();
+    resizeCanvas();
+    render();
+    updateHint();
+  }
+  function resizeCanvas() {
+    if (!state) return;
+    const wrap = document.getElementById('mapWrap');
+    // Lock the visible frame to its natural (unzoomed) size so zooming grows
+    // the canvas inside a fixed, scrollable viewport rather than resizing
+    // the whole page layout.
+    const baseW = wrap.clientWidth;
+    const aspect = state.map.rows / state.map.cols;
+    const baseH = Math.round(baseW * aspect);
+    if (!wrap.style.height || wrap.dataset.baseW !== String(baseW)) {
+      wrap.style.height = baseH + 'px';
+      wrap.dataset.baseW = String(baseW);
+    }
+    canvas.width = Math.round(baseW * zoomLevel);
+    canvas.height = Math.round(baseH * zoomLevel);
+    canvas.style.width = canvas.width + 'px';
+    canvas.style.height = canvas.height + 'px';
+    render();
+  }
+
+  function setZoom(newZoom) {
+    const wrap = document.getElementById('mapWrap');
+    const oldZoom = zoomLevel;
+    zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+    if (zoomLevel === oldZoom) return;
+    // Keep whatever is currently centered in view still centered after
+    // zooming, rather than snapping back to a corner.
+    const centerRatioX = (wrap.scrollLeft + wrap.clientWidth / 2) / (wrap.scrollWidth || 1);
+    const centerRatioY = (wrap.scrollTop + wrap.clientHeight / 2) / (wrap.scrollHeight || 1);
+    resizeCanvas();
+    wrap.scrollLeft = centerRatioX * wrap.scrollWidth - wrap.clientWidth / 2;
+    wrap.scrollTop = centerRatioY * wrap.scrollHeight - wrap.clientHeight / 2;
+  }
+
+  // ---------------- Init ----------------
+  function showError(msg) {
+    const banner = document.getElementById('errorBanner');
+    if (banner) { banner.textContent = 'Error: ' + msg; banner.style.display = 'block'; }
+  }
+  window.addEventListener('error', (e) => showError((e.message || 'unknown error') + (e.filename ? ` (${e.filename.split('/').pop()}:${e.lineno})` : '')));
+  window.addEventListener('unhandledrejection', (e) => showError('unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+
+  function init() {
+    try {
+    canvas = document.getElementById('mapCanvas');
+    ctx = canvas.getContext('2d');
+    offCanvas = document.createElement('canvas');
+    offCtx = offCanvas.getContext('2d');
+
+    canvas.addEventListener('click', onCanvasClick);
+    window.addEventListener('resize', () => resizeCanvas());
+    document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(zoomLevel + ZOOM_STEP));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(zoomLevel - ZOOM_STEP));
+
+    // Keyboard shortcuts for the main actions. Clicking the actual button
+    // (rather than calling the underlying function directly) means disabled
+    // states - e.g. End Turn locked during capital choice - are respected
+    // automatically, since a disabled button's click() is a no-op. Ignored
+    // while typing in a text field, and while a modal is open (so typing a
+    // nation name or reading Help doesn't accidentally trigger game actions).
+    const KEY_SHORTCUTS = {
+      'a': 'attackModeBtn', 'b': 'buyarmyModeBtn', 'r': 'reinforceModeBtn',
+      'm': 'fortifyModeBtn', 't': 'terrainViewBtn', 'p': 'autoPlayBtn', 'e': 'endTurnBtn'
+    };
+    document.addEventListener('keydown', (e) => {
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (document.querySelector('.modal.open')) return;
+      if (!state || state.gameOver) return;
+      const btnId = KEY_SHORTCUTS[e.key.toLowerCase()];
+      if (!btnId) return;
+      const btn = document.getElementById(btnId);
+      if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+    });
+
+    document.getElementById('reinforceModeBtn').addEventListener('click', () => setMode('reinforce'));
+    document.getElementById('attackModeBtn').addEventListener('click', () => setMode('attack'));
+    document.getElementById('fortifyModeBtn').addEventListener('click', () => setMode('fortify'));
+    document.getElementById('buyarmyModeBtn').addEventListener('click', () => {
+      const human = state.players[0];
+      const result = buyArmyToPool(state, 0);
+      setHint(result.success ? `Raised 1 army for ${ARMY_PURCHASE_COST}g — it's in your reinforcement pool, ready to place.`
+        : (result.reason === 'cap' ? 'Army cap reached — cannot buy more.' : `Not enough gold (need ${ARMY_PURCHASE_COST}g, have ${human.gold}g).`));
+      render();
+    });
+    document.getElementById('endTurnBtn').addEventListener('click', endTurnClicked);
+    document.getElementById('autoReinforceBtn').addEventListener('click', () => { autoDistributeHuman(state); render(); updateHint(); });
+    document.getElementById('restartBtn').addEventListener('click', () => {
+      const w = document.getElementById('restartWarning'); if (w) w.style.display = 'block';
+      openModal('newGameModal');
+    });
+    document.getElementById('helpBtn').addEventListener('click', () => openModal('helpModal'));
+    document.getElementById('firstTimeCheckbox').addEventListener('change', (e) => {
+      document.getElementById('inlineInstructions').style.display = e.target.checked ? 'block' : 'none';
+    });
+    document.querySelectorAll('[data-close-modal]').forEach(b => b.addEventListener('click', (e) => {
+      e.target.closest('.modal').classList.remove('open');
+    }));
+    document.getElementById('beginBtn').addEventListener('click', () => {
+      try {
+        startNewGame(document.getElementById('nationNameInput').value.trim(), document.getElementById('godModeCheckbox').checked, document.getElementById('hardModeCheckbox').checked);
+      } catch (err) {
+        showError('Begin Campaign failed: ' + err.message);
+      }
+    });
+    document.getElementById('playAgainBtn').addEventListener('click', () => openModal('newGameModal'));
+    document.getElementById('terrainViewBtn').addEventListener('click', toggleViewMode);
+    document.getElementById('autoPlayBtn').addEventListener('click', toggleAutoPlay);
+
+    document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+      activeTab = b.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(x => x.classList.toggle('active', x === b));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.toggle('active', x.id === activeTab + 'Panel'));
+    }));
+
+    document.getElementById('newGameModal').classList.add('open');
+    } catch (err) {
+      showError('init() failed: ' + err.message);
+    }
+  }
+
+  // Some HTML preview/visualizer tools inject this document's content into an
+  // already-loaded page rather than navigating a browser to it - in that
+  // case 'DOMContentLoaded' has already fired and never fires again, so a
+  // plain addEventListener here would mean init() (and therefore every
+  // button on the page) never runs. Guard against that by checking whether
+  // the document is already past the "loading" stage and, if so, running
+  // init() immediately instead of waiting for an event that won't come.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+</script>
+</body>
+</html>
